@@ -27,8 +27,8 @@ async function getUserShowsContext(userId: string, accessToken: string): Promise
     .eq('active', true);
 
   const showList = (shows || [])
-    .map((s: { title: string; status: string; services?: { name: string } | null }) =>
-      `${s.title} (${s.status}) on ${s.services?.name || 'unknown'}`
+    .map((s: { title: any; status: any; services: any }) =>
+      `${s.title} (${s.status}) on ${(Array.isArray(s.services) ? s.services[0]?.name : s.services?.name) || 'unknown'}`
     )
     .join(', ');
 
