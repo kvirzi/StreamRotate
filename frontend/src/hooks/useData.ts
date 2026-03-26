@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { servicesApi, showsApi } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { Service, Show } from '../types';
@@ -7,18 +7,22 @@ export function useServices() {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isFirstLoad = useRef(true);
 
   const refresh = useCallback(async () => {
+    // Only show the full-page loading state on initial mount, not on manual refreshes
+    if (isFirstLoad.current) setLoading(true);
     try {
-      setLoading(true);
       const { data } = await servicesApi.getAll();
-      setServices(data);
+      setServices(Array.isArray(data) ? data : []);
       setError(null);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       setError(e.response?.data?.error || 'Failed to load services');
+      setServices([]);
     } finally {
       setLoading(false);
+      isFirstLoad.current = false;
     }
   }, []);
 
@@ -31,18 +35,22 @@ export function useShows() {
   const [shows, setShows] = useState<Show[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isFirstLoad = useRef(true);
 
   const refresh = useCallback(async () => {
+    // Only show the full-page loading state on initial mount, not on manual refreshes
+    if (isFirstLoad.current) setLoading(true);
     try {
-      setLoading(true);
       const { data } = await showsApi.getAll();
-      setShows(data);
+      setShows(Array.isArray(data) ? data : []);
       setError(null);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       setError(e.response?.data?.error || 'Failed to load shows');
+      setShows([]);
     } finally {
       setLoading(false);
+      isFirstLoad.current = false;
     }
   }, []);
 

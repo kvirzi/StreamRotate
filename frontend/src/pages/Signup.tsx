@@ -20,7 +20,11 @@ export function Signup() {
     if (password.length < 8) { setError('Password must be at least 8 characters'); return; }
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: `${window.location.origin}/app` },
+      });
       if (error) { setError(error.message); return; }
       if (data.user && !data.session) {
         setSuccess('Check your email to confirm your account, then sign in.');
@@ -34,10 +38,16 @@ export function Signup() {
 
   const handleGoogle = async () => {
     setGoogleLoading(true);
-    await supabase.auth.signInWithOAuth({
+    setError('');
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/app` },
     });
+    if (error) {
+      setError(error.message);
+      setGoogleLoading(false);
+    }
+    // On success, browser redirects — no need to setLoading(false)
   };
 
   return (
