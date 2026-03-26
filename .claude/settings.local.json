@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create:*)",
+      "Bash(npm install:*)",
+      "Bash(npx create-vite@latest . --template react-ts --yes)",
+      "Bash(npm --version)",
+      "Bash(npm run:*)",
+      "Read(//Users/kvirzi/**)",
+      "Read(//usr/local/Cellar/node/15.3.0/bin/**)",
+      "Bash(command -v fnm)",
+      "Bash(command -v brew)",
+      "Bash(brew install:*)",
+      "Bash(brew link:*)",
+      "Read(//usr/local/Cellar/**)",
+      "Read(//opt/homebrew/**)",
+      "Read(//usr/local/bin/**)",
+      "mcp__Claude_Preview__preview_start"
+    ]
+  }
+}
