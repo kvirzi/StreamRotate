@@ -78,7 +78,6 @@ export function AppPage() {
       }
       await showsApi.create(payload);
       await refreshShows();
-      setPage('shows');
     } catch { /* ignore */ }
   };
 

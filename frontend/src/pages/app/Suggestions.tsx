@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sparkles, Plus, X, RefreshCw, Play, Lock } from 'lucide-react';
+import { Sparkles, Plus, X, RefreshCw, Play, Lock, Check } from 'lucide-react';
 import { Suggestion } from '../../types';
 import { suggestionsApi, tmdbApi } from '../../lib/api';
 import { Button } from '../../components/Button';
@@ -18,6 +18,8 @@ export function Suggestions({ plan, onUpgrade, onAddShow }: SuggestionsProps) {
   const [trailers, setTrailers] = useState<Record<number, string | null>>({});
   const [loadingTrailers, setLoadingTrailers] = useState<Set<number>>(new Set());
   const [dismissed, setDismissed] = useState<Set<number>>(new Set());
+  const [adding, setAdding] = useState<Set<number>>(new Set());
+  const [added, setAdded] = useState<Set<number>>(new Set());
   const [error, setError] = useState('');
 
   const fetchSuggestions = async () => {
@@ -41,6 +43,26 @@ export function Suggestions({ plan, onUpgrade, onAddShow }: SuggestionsProps) {
       setSuggestions(prev => prev.map((s, i) => (i === index ? data.suggestion : s)));
     } catch { /* ignore */ }
     finally { setReplacing(null); }
+  };
+
+  const handleAdd = async (suggestion: Suggestion, index: number) => {
+    const addingNext = new Set(adding);
+    addingNext.add(index);
+    setAdding(addingNext);
+    try {
+      await onAddShow(suggestion.title);
+      // Show ✓ briefly, then replace the card
+      setAdded(prev => new Set([...prev, index]));
+      setTimeout(() => {
+        setAdded(prev => { const s = new Set(prev); s.delete(index); return s; });
+        replaceSuggestion(index);
+      }, 800);
+    } catch { /* ignore */ }
+    finally {
+      const addingNext2 = new Set(adding);
+      addingNext2.delete(index);
+      setAdding(addingNext2);
+    }
   };
 
   const loadTrailer = async (suggestion: Suggestion, index: number) => {
@@ -179,11 +201,13 @@ export function Suggestions({ plan, onUpgrade, onAddShow }: SuggestionsProps) {
                   <div className="flex gap-2">
                     <Button
                       size="sm"
-                      onClick={() => onAddShow(suggestion.title)}
-                      className="flex-1 gap-1.5"
+                      onClick={() => handleAdd(suggestion, index)}
+                      loading={adding.has(index)}
+                      className={`flex-1 gap-1.5 transition-colors ${added.has(index) ? 'bg-green-600 hover:bg-green-600' : ''}`}
+                      disabled={added.has(index)}
                     >
-                      <Plus size={13} />
-                      Add to list
+                      {added.has(index) ? <Check size={13} /> : <Plus size={13} />}
+                      {added.has(index) ? 'Added!' : 'Add to list'}
                     </Button>
                     <button
                       onClick={() => loadTrailer(suggestion, index)}
