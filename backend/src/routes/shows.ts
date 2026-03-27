@@ -138,13 +138,15 @@ router.post('/:id/episodes', async (req: AuthRequest, res: Response): Promise<vo
     return;
   }
 
-  // Delete existing episodes only for this season (not all seasons)
-  const seasonNumber = episodes[0]?.season_number;
-  if (seasonNumber !== undefined) {
-    await client.from('episodes').delete().eq('show_id', id).eq('season_number', seasonNumber);
-  } else {
-    await client.from('episodes').delete().eq('show_id', id);
+  // Nothing to save — return early without touching existing episodes
+  if (episodes.length === 0) {
+    res.status(201).json({ message: 'No episodes to save' });
+    return;
   }
+
+  // Delete existing episodes only for this season (not all seasons)
+  const seasonNumber = episodes[0].season_number;
+  await client.from('episodes').delete().eq('show_id', id).eq('season_number', seasonNumber);
 
   // Insert new episodes
   if (episodes.length > 0) {

@@ -45,6 +45,8 @@ type ShowCategory = 'live' | 'offseason' | 'closed';
 const getCategory = (show: { tv_status: string | null; next_air_date: string | null; status: string }): ShowCategory => {
   if (show.status === 'watching') return 'live';
   if (show.tv_status && ENDED_STATUSES.has(show.tv_status)) return 'closed';
+  // If user marked done and we have no TMDB status, treat as closed
+  if (show.status === 'done' && !show.tv_status) return 'closed';
   if (show.tv_status === 'Returning Series' && !show.next_air_date) return 'offseason';
   return 'live';
 };
@@ -285,6 +287,8 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
     try {
       const { data } = await tmdbApi.getSeason(show.tmdb_id, season);
       const episodes: Omit<TmdbEpisode, 'id' | 'overview' | 'still_path'>[] = data.episodes || [];
+      // Don't save (or delete!) anything if TMDB has no episodes for this season yet
+      if (episodes.length === 0) return;
       await showsApi.saveEpisodes(show.id, episodes.map(ep => ({
         season_number: ep.season_number,
         episode_number: ep.episode_number,
@@ -589,7 +593,10 @@ function ShowRow({
 
   return (
     <div>
-      <div className="flex items-center gap-3 px-5 py-3.5 group hover:bg-bg-hover/30 transition-colors">
+      <div
+        onClick={onToggleExpand}
+        className="flex items-center gap-3 px-5 py-3.5 group hover:bg-bg-hover/30 transition-colors cursor-pointer"
+      >
         <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
           show.status === 'watching' ? 'bg-accent-teal' :
           show.status === 'done' ? 'bg-green-500' : 'bg-bg-border'
@@ -611,20 +618,23 @@ function ShowRow({
         </div>
 
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={onEdit} className="p-1.5 text-text-muted hover:text-text-primary hover:bg-bg-hover rounded-lg">
+          <button
+            onClick={e => { e.stopPropagation(); onEdit(); }}
+            className="p-1.5 text-text-muted hover:text-text-primary hover:bg-bg-hover rounded-lg"
+          >
             <Edit2 size={14} />
           </button>
-          <button onClick={onDelete} className="p-1.5 text-text-muted hover:text-red-400 hover:bg-red-900/10 rounded-lg">
+          <button
+            onClick={e => { e.stopPropagation(); onDelete(); }}
+            className="p-1.5 text-text-muted hover:text-red-400 hover:bg-red-900/10 rounded-lg"
+          >
             <Trash2 size={14} />
           </button>
         </div>
 
-        <button
-          onClick={onToggleExpand}
-          className="p-1.5 text-text-muted hover:text-text-primary hover:bg-bg-hover rounded-lg ml-1"
-        >
+        <div className="p-1.5 text-text-muted ml-1">
           {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </button>
+        </div>
       </div>
 
       {/* Episode checklist */}
