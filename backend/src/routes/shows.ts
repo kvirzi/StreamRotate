@@ -138,8 +138,13 @@ router.post('/:id/episodes', async (req: AuthRequest, res: Response): Promise<vo
     return;
   }
 
-  // Delete existing episodes for this show
-  await client.from('episodes').delete().eq('show_id', id);
+  // Delete existing episodes only for this season (not all seasons)
+  const seasonNumber = episodes[0]?.season_number;
+  if (seasonNumber !== undefined) {
+    await client.from('episodes').delete().eq('show_id', id).eq('season_number', seasonNumber);
+  } else {
+    await client.from('episodes').delete().eq('show_id', id);
+  }
 
   // Insert new episodes
   if (episodes.length > 0) {

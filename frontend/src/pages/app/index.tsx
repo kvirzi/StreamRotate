@@ -88,6 +88,7 @@ export function AppPage() {
             total_seasons: showData.number_of_seasons,
             episodes_remaining: season1?.episode_count || 0,
             tv_status: showData.status || null,
+            next_air_date: (showData.next_episode_to_air as { air_date?: string } | null)?.air_date || null,
           };
         } catch { /* ignore */ }
 
