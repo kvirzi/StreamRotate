@@ -329,10 +329,10 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
         }
       }
     }
-    // Mark everything watched in one call
-    await showsApi.markAllWatched(show.id);
-    // Set show status to done and refresh so it drops back to Closed section
-    await showsApi.update(show.id, { status: 'done' });
+    // Mark everything watched + set done/clear episode count — each wrapped so one failure can't block the rest
+    try { await showsApi.markAllWatched(show.id); } catch { /* ignore */ }
+    try { await showsApi.update(show.id, { status: 'done', episodes_remaining: 0 }); } catch { /* ignore */ }
+    // Always refresh so UI reflects DB state
     await onRefresh();
     // Refresh local episode state for the current season
     const season = activeSeason[show.id] || show.current_season || 1;
@@ -344,10 +344,14 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
     const unwatched = episodes.filter(ep => !ep.watched);
     if (unwatched.length === 0) return;
     await Promise.all(unwatched.map(ep => showsApi.updateEpisode(show.id, ep.id, true)));
+    // Update local episode map immediately
     setEpisodesMap(prev => ({
       ...prev,
       [show.id]: (prev[show.id] || []).map(ep => ({ ...ep, watched: true })),
     }));
+    // Clear the "episodes remaining" counter on the show itself and refresh
+    try { await showsApi.update(show.id, { episodes_remaining: 0 }); } catch { /* ignore */ }
+    await onRefresh();
   };
 
   const handleSeasonChange = async (show: Show, season: number) => {
