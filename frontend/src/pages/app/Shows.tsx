@@ -83,12 +83,34 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
     setSearchResults([]);
     try {
       const { data } = await tmdbApi.getShow(result.id);
+
+      // Auto-fill episode count from season 1
+      const season1 = (data.seasons as { season_number: number; episode_count: number }[])
+        ?.find(s => s.season_number === 1);
+      const episodesInSeason = season1?.episode_count || 0;
+
       setForm(f => ({
         ...f,
         title: data.name,
         tmdb_id: data.id.toString(),
         total_seasons: data.number_of_seasons?.toString() || '',
+        episodes_remaining: episodesInSeason > 0 ? episodesInSeason.toString() : f.episodes_remaining,
       }));
+
+      // Auto-match streaming service from TMDB watch providers (US flatrate)
+      try {
+        const { data: providerData } = await tmdbApi.getProviders(result.id);
+        const usProviders: { provider_name: string }[] =
+          providerData?.results?.US?.flatrate || [];
+        const match = services.find(svc =>
+          usProviders.some(p =>
+            p.provider_name.toLowerCase().includes(svc.name.toLowerCase()) ||
+            svc.name.toLowerCase().includes(p.provider_name.toLowerCase())
+          )
+        );
+        if (match) setForm(f => ({ ...f, service_id: match.id }));
+      } catch { /* best-effort */ }
+
     } catch {
       setForm(f => ({ ...f, title: result.name, tmdb_id: result.id.toString() }));
     }

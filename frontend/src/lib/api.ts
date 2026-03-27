@@ -44,6 +44,7 @@ export const tmdbApi = {
   getShow: (tmdbId: number) => api.get(`/tmdb/show/${tmdbId}`),
   getSeason: (tmdbId: number, season: number) => api.get(`/tmdb/show/${tmdbId}/season/${season}`),
   getVideos: (tmdbId: number) => api.get(`/tmdb/show/${tmdbId}/videos`),
+  getProviders: (tmdbId: number) => api.get(`/tmdb/show/${tmdbId}/providers`),
 };
 
 export const suggestionsApi = {

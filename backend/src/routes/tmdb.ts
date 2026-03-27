@@ -66,6 +66,20 @@ router.get('/show/:tmdbId/season/:num', async (req: Request, res: Response): Pro
   }
 });
 
+// GET /api/tmdb/show/:tmdbId/providers
+router.get('/show/:tmdbId/providers', async (req: Request, res: Response): Promise<void> => {
+  const { tmdbId } = req.params;
+  try {
+    const response = await axios.get(`${TMDB_BASE}/tv/${tmdbId}/watch/providers`, {
+      headers: tmdbHeaders(),
+    });
+    res.json(response.data);
+  } catch (err: unknown) {
+    const error = err as { response?: { data: unknown; status: number } };
+    res.status(error.response?.status || 500).json(error.response?.data || { error: 'TMDB request failed' });
+  }
+});
+
 // GET /api/tmdb/show/:tmdbId/videos
 router.get('/show/:tmdbId/videos', async (req: Request, res: Response): Promise<void> => {
   const { tmdbId } = req.params;
