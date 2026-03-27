@@ -272,13 +272,19 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
 
   const toggleEpisode = async (show: Show, episode: Episode) => {
     try {
-      await showsApi.updateEpisode(show.id, episode.id, !episode.watched);
-      setEpisodesMap(prev => ({
-        ...prev,
-        [show.id]: prev[show.id].map(ep =>
-          ep.id === episode.id ? { ...ep, watched: !ep.watched } : ep
-        ),
-      }));
+      const newWatched = !episode.watched;
+      await showsApi.updateEpisode(show.id, episode.id, newWatched);
+      const updated = (episodesMap[show.id] || []).map(ep =>
+        ep.id === episode.id ? { ...ep, watched: newWatched } : ep
+      );
+      setEpisodesMap(prev => ({ ...prev, [show.id]: updated }));
+
+      // If every loaded episode is now watched, clear the episodes_remaining counter
+      const allWatched = updated.length > 0 && updated.every(ep => ep.watched);
+      if (allWatched) {
+        try { await showsApi.update(show.id, { episodes_remaining: 0 }); } catch { /* ignore */ }
+        await onRefresh();
+      }
     } catch { /* ignore */ }
   };
 
