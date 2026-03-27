@@ -23,6 +23,7 @@ interface ShowFormData {
   tmdb_id: string;
   total_seasons: string;
   current_season: string;
+  tv_status: string;
 }
 
 const EMPTY_FORM: ShowFormData = {
@@ -33,7 +34,12 @@ const EMPTY_FORM: ShowFormData = {
   tmdb_id: '',
   total_seasons: '',
   current_season: '1',
+  tv_status: '',
 };
+
+const ENDED_STATUSES = new Set(['Ended', 'Canceled', 'Cancelled']);
+const isShowEnded = (show: { tv_status: string | null; status: string }) =>
+  !!show.tv_status && ENDED_STATUSES.has(show.tv_status) && show.status !== 'watching';
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -95,6 +101,7 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
         tmdb_id: data.id.toString(),
         total_seasons: data.number_of_seasons?.toString() || '',
         episodes_remaining: episodesInSeason > 0 ? episodesInSeason.toString() : f.episodes_remaining,
+        tv_status: data.status || '',
       }));
 
       // Auto-match streaming service from TMDB watch providers (US flatrate)
@@ -151,6 +158,7 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
       tmdb_id: show.tmdb_id?.toString() || '',
       total_seasons: show.total_seasons?.toString() || '',
       current_season: show.current_season?.toString() || '1',
+      tv_status: show.tv_status || '',
     });
     setSearchQuery(show.title);
     setSearchResults([]);
@@ -171,6 +179,7 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
         tmdb_id: form.tmdb_id ? parseInt(form.tmdb_id) : null,
         total_seasons: form.total_seasons ? parseInt(form.total_seasons) : null,
         current_season: parseInt(form.current_season) || 1,
+        tv_status: form.tv_status || null,
       };
       if (editingShow) {
         await showsApi.update(editingShow.id, payload);
@@ -342,6 +351,8 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
           {Object.entries(grouped).map(([serviceId, serviceShows]) => {
             const service = services.find(s => s.id === serviceId);
             if (!service) return null;
+            const liveShows = serviceShows.filter(s => !isShowEnded(s));
+            const closedShows = serviceShows.filter(s => isShowEnded(s));
             return (
               <div key={serviceId} className="bg-bg-card border border-bg-border rounded-2xl overflow-hidden">
                 <div className="flex items-center gap-3 px-5 py-4 border-b border-bg-border bg-bg-secondary/50">
@@ -350,25 +361,35 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
                   <span className="text-xs text-text-muted bg-bg-hover px-2 py-0.5 rounded-full">{serviceShows.length}</span>
                 </div>
                 <div className="divide-y divide-bg-border">
-                  {serviceShows.map(show => (
-                    <ShowRow
-                      key={show.id}
-                      show={show}
-                      expanded={expandedShows.has(show.id)}
-                      episodes={episodesMap[show.id] || []}
-                      loadingEpisodes={loadingEpisodes.has(show.id)}
-                      activeSeason={activeSeason[show.id] || show.current_season || 1}
-                      plan={plan}
-                      onToggleExpand={() => toggleExpand(show)}
-                      onEdit={() => openEdit(show)}
-                      onDelete={() => setDeleteConfirm(show.id)}
-                      onToggleEpisode={(ep) => toggleEpisode(show, ep)}
-                      onSeasonChange={(s) => handleSeasonChange(show, s)}
-                      onLoadTmdb={(s) => loadTmdbEpisodes(show, s)}
-                      onMarkSeasonWatched={() => markSeasonWatched(show)}
-                      statusColors={statusColors}
+                  {liveShows.map(show => (
+                    <ShowRow key={show.id} show={show}
+                      expanded={expandedShows.has(show.id)} episodes={episodesMap[show.id] || []}
+                      loadingEpisodes={loadingEpisodes.has(show.id)} activeSeason={activeSeason[show.id] || show.current_season || 1}
+                      plan={plan} onToggleExpand={() => toggleExpand(show)} onEdit={() => openEdit(show)}
+                      onDelete={() => setDeleteConfirm(show.id)} onToggleEpisode={(ep) => toggleEpisode(show, ep)}
+                      onSeasonChange={(s) => handleSeasonChange(show, s)} onLoadTmdb={(s) => loadTmdbEpisodes(show, s)}
+                      onMarkSeasonWatched={() => markSeasonWatched(show)} statusColors={statusColors}
                     />
                   ))}
+                  {closedShows.length > 0 && (
+                    <>
+                      <div className="flex items-center gap-3 px-5 py-2 bg-bg-secondary/30">
+                        <div className="flex-1 h-px bg-bg-border" />
+                        <span className="text-[10px] font-medium text-text-muted uppercase tracking-widest whitespace-nowrap">Closed Shows</span>
+                        <div className="flex-1 h-px bg-bg-border" />
+                      </div>
+                      {closedShows.map(show => (
+                        <ShowRow key={show.id} show={show}
+                          expanded={expandedShows.has(show.id)} episodes={episodesMap[show.id] || []}
+                          loadingEpisodes={loadingEpisodes.has(show.id)} activeSeason={activeSeason[show.id] || show.current_season || 1}
+                          plan={plan} onToggleExpand={() => toggleExpand(show)} onEdit={() => openEdit(show)}
+                          onDelete={() => setDeleteConfirm(show.id)} onToggleEpisode={(ep) => toggleEpisode(show, ep)}
+                          onSeasonChange={(s) => handleSeasonChange(show, s)} onLoadTmdb={(s) => loadTmdbEpisodes(show, s)}
+                          onMarkSeasonWatched={() => markSeasonWatched(show)} statusColors={statusColors}
+                        />
+                      ))}
+                    </>
+                  )}
                 </div>
               </div>
             );
@@ -381,24 +402,35 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
                 <h2 className="font-display font-semibold text-text-muted text-sm">Unassigned</h2>
               </div>
               <div className="divide-y divide-bg-border">
-                {noService.map(show => (
-                  <ShowRow
-                    key={show.id}
-                    show={show}
-                    expanded={expandedShows.has(show.id)}
-                    episodes={episodesMap[show.id] || []}
-                    loadingEpisodes={loadingEpisodes.has(show.id)}
-                    activeSeason={activeSeason[show.id] || show.current_season || 1}
-                    plan={plan}
-                    onToggleExpand={() => toggleExpand(show)}
-                    onEdit={() => openEdit(show)}
-                    onDelete={() => setDeleteConfirm(show.id)}
-                    onToggleEpisode={(ep) => toggleEpisode(show, ep)}
-                    onSeasonChange={(s) => handleSeasonChange(show, s)}
-                    onLoadTmdb={(s) => loadTmdbEpisodes(show, s)}
-                    statusColors={statusColors}
+                {noService.filter(s => !isShowEnded(s)).map(show => (
+                  <ShowRow key={show.id} show={show}
+                    expanded={expandedShows.has(show.id)} episodes={episodesMap[show.id] || []}
+                    loadingEpisodes={loadingEpisodes.has(show.id)} activeSeason={activeSeason[show.id] || show.current_season || 1}
+                    plan={plan} onToggleExpand={() => toggleExpand(show)} onEdit={() => openEdit(show)}
+                    onDelete={() => setDeleteConfirm(show.id)} onToggleEpisode={(ep) => toggleEpisode(show, ep)}
+                    onSeasonChange={(s) => handleSeasonChange(show, s)} onLoadTmdb={(s) => loadTmdbEpisodes(show, s)}
+                    onMarkSeasonWatched={() => markSeasonWatched(show)} statusColors={statusColors}
                   />
                 ))}
+                {noService.filter(s => isShowEnded(s)).length > 0 && (
+                  <>
+                    <div className="flex items-center gap-3 px-5 py-2 bg-bg-secondary/30">
+                      <div className="flex-1 h-px bg-bg-border" />
+                      <span className="text-[10px] font-medium text-text-muted uppercase tracking-widest whitespace-nowrap">Closed Shows</span>
+                      <div className="flex-1 h-px bg-bg-border" />
+                    </div>
+                    {noService.filter(s => isShowEnded(s)).map(show => (
+                      <ShowRow key={show.id} show={show}
+                        expanded={expandedShows.has(show.id)} episodes={episodesMap[show.id] || []}
+                        loadingEpisodes={loadingEpisodes.has(show.id)} activeSeason={activeSeason[show.id] || show.current_season || 1}
+                        plan={plan} onToggleExpand={() => toggleExpand(show)} onEdit={() => openEdit(show)}
+                        onDelete={() => setDeleteConfirm(show.id)} onToggleEpisode={(ep) => toggleEpisode(show, ep)}
+                        onSeasonChange={(s) => handleSeasonChange(show, s)} onLoadTmdb={(s) => loadTmdbEpisodes(show, s)}
+                        onMarkSeasonWatched={() => markSeasonWatched(show)} statusColors={statusColors}
+                      />
+                    ))}
+                  </>
+                )}
               </div>
             </div>
           )}
