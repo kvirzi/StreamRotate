@@ -102,12 +102,28 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
         const { data: providerData } = await tmdbApi.getProviders(result.id);
         const usProviders: { provider_name: string }[] =
           providerData?.results?.US?.flatrate || [];
-        const match = services.find(svc =>
-          usProviders.some(p =>
-            p.provider_name.toLowerCase().includes(svc.name.toLowerCase()) ||
-            svc.name.toLowerCase().includes(p.provider_name.toLowerCase())
-          )
-        );
+
+        // Aliases for services that have been renamed or have multiple common names
+        const ALIASES: Record<string, string[]> = {
+          'max': ['hbo max', 'max (us)'],
+          'hbo max': ['max', 'max (us)'],
+          'amazon prime': ['amazon prime video', 'prime video'],
+          'prime video': ['amazon prime', 'amazon prime video'],
+          'apple tv+': ['apple tv plus', 'apple tv'],
+          'disney+': ['disney plus'],
+        };
+
+        const normalize = (name: string) => name.toLowerCase().trim();
+
+        const match = services.find(svc => {
+          const svcKey = normalize(svc.name);
+          const svcAliases = [svcKey, ...(ALIASES[svcKey] || [])];
+          return usProviders.some(p => {
+            const provKey = normalize(p.provider_name);
+            const provAliases = [provKey, ...(ALIASES[provKey] || [])];
+            return svcAliases.some(s => provAliases.some(pA => s.includes(pA) || pA.includes(s)));
+          });
+        });
         if (match) setForm(f => ({ ...f, service_id: match.id }));
       } catch { /* best-effort */ }
 
