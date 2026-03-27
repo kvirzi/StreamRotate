@@ -66,17 +66,76 @@ export function AppPage() {
   const handleAddShowFromSuggestion = async (title: string, tmdbId?: number) => {
     try {
       let payload: Record<string, unknown> = { title, status: 'queued' };
-      if (tmdbId) {
+      let resolvedTmdbId = tmdbId;
+
+      // If no tmdbId passed, search TMDB by title to find it
+      if (!resolvedTmdbId) {
         try {
-          const { data } = await tmdbApi.getShow(tmdbId);
-          payload = {
-            ...payload,
-            tmdb_id: tmdbId,
-            total_seasons: data.number_of_seasons,
-          };
+          const { data: searchData } = await tmdbApi.search(title);
+          resolvedTmdbId = searchData.results?.[0]?.id;
         } catch { /* ignore */ }
       }
-      await showsApi.create(payload);
+
+      if (resolvedTmdbId) {
+        try {
+          const { data: showData } = await tmdbApi.getShow(resolvedTmdbId);
+          const season1 = (showData.seasons as { season_number: number; episode_count: number }[])
+            ?.find((s: { season_number: number }) => s.season_number === 1);
+
+          payload = {
+            ...payload,
+            tmdb_id: resolvedTmdbId,
+            total_seasons: showData.number_of_seasons,
+            episodes_remaining: season1?.episode_count || 0,
+            tv_status: showData.status || null,
+          };
+        } catch { /* ignore */ }
+
+        // Auto-match service from TMDB providers
+        try {
+          const { data: providerData } = await tmdbApi.getProviders(resolvedTmdbId);
+          const usProviders: { provider_name: string }[] = providerData?.results?.US?.flatrate || [];
+          const ALIASES: Record<string, string[]> = {
+            'max': ['hbo max', 'max (us)'],
+            'hbo max': ['max', 'max (us)'],
+            'amazon prime': ['amazon prime video', 'prime video'],
+            'prime video': ['amazon prime', 'amazon prime video'],
+            'apple tv+': ['apple tv plus', 'apple tv'],
+            'disney+': ['disney plus'],
+          };
+          const normalize = (name: string) => name.toLowerCase().trim();
+          const match = services.find(svc => {
+            const svcKey = normalize(svc.name);
+            const svcAliases = [svcKey, ...(ALIASES[svcKey] || [])];
+            return usProviders.some(p => {
+              const provKey = normalize(p.provider_name);
+              const provAliases = [provKey, ...(ALIASES[provKey] || [])];
+              return svcAliases.some(s => provAliases.some(pA => s.includes(pA) || pA.includes(s)));
+            });
+          });
+          if (match) payload.service_id = match.id;
+        } catch { /* ignore */ }
+      }
+
+      const { data: newShow } = await showsApi.create(payload);
+
+      // Auto-save season 1 episodes
+      if (newShow?.id && resolvedTmdbId) {
+        try {
+          const { data: seasonData } = await tmdbApi.getSeason(resolvedTmdbId, 1);
+          const episodes = seasonData.episodes || [];
+          if (episodes.length > 0) {
+            await showsApi.saveEpisodes(newShow.id, episodes.map((ep: { season_number: number; episode_number: number; name: string; air_date: string }) => ({
+              season_number: ep.season_number,
+              episode_number: ep.episode_number,
+              title: ep.name,
+              air_date: ep.air_date,
+              watched: false,
+            })));
+          }
+        } catch { /* ignore */ }
+      }
+
       await refreshShows();
     } catch { /* ignore */ }
   };
