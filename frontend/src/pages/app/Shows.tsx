@@ -308,28 +308,32 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
   };
 
   const markAllSeasonsWatched = async (show: Show) => {
-    if (!show.tmdb_id || !show.total_seasons) return;
-    // Load any missing seasons from TMDB first
-    for (let s = 1; s <= show.total_seasons; s++) {
-      const existing = await showsApi.getEpisodes(show.id, s).then(r => r.data).catch(() => []);
-      if (!existing || existing.length === 0) {
-        try {
-          const { data } = await tmdbApi.getSeason(show.tmdb_id, s);
-          const eps = data.episodes || [];
-          if (eps.length > 0) {
-            await showsApi.saveEpisodes(show.id, eps.map((ep: { season_number: number; episode_number: number; name: string; air_date: string }) => ({
-              season_number: ep.season_number,
-              episode_number: ep.episode_number,
-              title: ep.name,
-              air_date: ep.air_date,
-              watched: false,
-            })));
-          }
-        } catch { /* ignore */ }
+    // Load any missing seasons from TMDB first (only if we have TMDB info)
+    if (show.tmdb_id && show.total_seasons) {
+      for (let s = 1; s <= show.total_seasons; s++) {
+        const existing = await showsApi.getEpisodes(show.id, s).then(r => r.data).catch(() => []);
+        if (!existing || existing.length === 0) {
+          try {
+            const { data } = await tmdbApi.getSeason(show.tmdb_id, s);
+            const eps = data.episodes || [];
+            if (eps.length > 0) {
+              await showsApi.saveEpisodes(show.id, eps.map((ep: { season_number: number; episode_number: number; name: string; air_date: string }) => ({
+                season_number: ep.season_number,
+                episode_number: ep.episode_number,
+                title: ep.name,
+                air_date: ep.air_date,
+                watched: false,
+              })));
+            }
+          } catch { /* ignore */ }
+        }
       }
     }
-    // Now mark everything watched in one call
+    // Mark everything watched in one call
     await showsApi.markAllWatched(show.id);
+    // Set show status to done and refresh so it drops back to Closed section
+    await showsApi.update(show.id, { status: 'done' });
+    await onRefresh();
     // Refresh local episode state for the current season
     const season = activeSeason[show.id] || show.current_season || 1;
     await loadEpisodes(show.id, season);

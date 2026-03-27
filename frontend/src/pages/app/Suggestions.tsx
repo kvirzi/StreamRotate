@@ -52,12 +52,12 @@ export function Suggestions({ plan, onUpgrade, onAddShow }: SuggestionsProps) {
     setAdding(addingNext);
     try {
       await onAddShow(suggestion.title);
-      // Show ✓ briefly, then replace the card
+      // Show ✓ briefly, then replace the card almost immediately
       setAdded(prev => new Set([...prev, index]));
       setTimeout(() => {
         setAdded(prev => { const s = new Set(prev); s.delete(index); return s; });
         replaceSuggestion(index);
-      }, 800);
+      }, 150);
     } catch { /* ignore */ }
     finally {
       const addingNext2 = new Set(adding);
