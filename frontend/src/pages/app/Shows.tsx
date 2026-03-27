@@ -276,6 +276,17 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
     } catch { /* ignore */ }
   };
 
+  const markSeasonWatched = async (show: Show) => {
+    const episodes = episodesMap[show.id] || [];
+    const unwatched = episodes.filter(ep => !ep.watched);
+    if (unwatched.length === 0) return;
+    await Promise.all(unwatched.map(ep => showsApi.updateEpisode(show.id, ep.id, true)));
+    setEpisodesMap(prev => ({
+      ...prev,
+      [show.id]: (prev[show.id] || []).map(ep => ({ ...ep, watched: true })),
+    }));
+  };
+
   const handleSeasonChange = async (show: Show, season: number) => {
     setActiveSeason(prev => ({ ...prev, [show.id]: season }));
     const fetched = await loadEpisodes(show.id, season);
@@ -354,6 +365,7 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
                       onToggleEpisode={(ep) => toggleEpisode(show, ep)}
                       onSeasonChange={(s) => handleSeasonChange(show, s)}
                       onLoadTmdb={(s) => loadTmdbEpisodes(show, s)}
+                      onMarkSeasonWatched={() => markSeasonWatched(show)}
                       statusColors={statusColors}
                     />
                   ))}
@@ -536,13 +548,14 @@ interface ShowRowProps {
   onToggleEpisode: (ep: Episode) => void;
   onSeasonChange: (season: number) => void;
   onLoadTmdb: (season: number) => void;
+  onMarkSeasonWatched: () => void;
   statusColors: Record<string, string>;
 }
 
 function ShowRow({
   show, expanded, episodes, loadingEpisodes, activeSeason, plan,
   onToggleExpand, onEdit, onDelete, onToggleEpisode, onSeasonChange, onLoadTmdb,
-  statusColors,
+  onMarkSeasonWatched, statusColors,
 }: ShowRowProps) {
   const watchedCount = episodes.filter(e => e.watched).length;
   const progress = episodes.length > 0 ? Math.round((watchedCount / episodes.length) * 100) : 0;
@@ -630,7 +643,17 @@ function ShowRow({
               {/* Progress */}
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs text-text-muted">{watchedCount}/{episodes.length} watched</span>
-                <span className="text-xs text-text-muted">{progress}%</span>
+                <div className="flex items-center gap-3">
+                  {watchedCount < episodes.length && (
+                    <button
+                      onClick={onMarkSeasonWatched}
+                      className="text-xs text-accent-teal hover:text-accent-teal/80 transition-colors"
+                    >
+                      Mark all watched
+                    </button>
+                  )}
+                  <span className="text-xs text-text-muted">{progress}%</span>
+                </div>
               </div>
               <div className="progress-bar mb-3">
                 <div className="progress-bar-fill bg-accent-teal" style={{ width: `${progress}%` }} />
