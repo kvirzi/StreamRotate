@@ -177,22 +177,6 @@ export function Suggestions({ plan, onUpgrade, onAddShow }: SuggestionsProps) {
           {suggestions.map((suggestion, index) => (
             !dismissed.has(index) && (
               <div key={index} className="bg-bg-card border border-bg-border rounded-2xl overflow-hidden card-hover">
-                {/* Trailer embed */}
-                {trailers[index] && (
-                  <div className="relative pt-[56.25%] bg-black">
-                    <iframe
-                      className="absolute inset-0 w-full h-full"
-                      src={`https://www.youtube.com/embed/${trailers[index]}?autoplay=0`}
-                      title={`${suggestion.title} trailer`}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  </div>
-                )}
-                {trailers[index] === null && (
-                  <div className="bg-bg-hover px-4 py-2 text-xs text-text-muted">No trailer found</div>
-                )}
-
                 <div className="p-4">
                   {/* Header */}
                   <div className="flex items-start justify-between gap-2 mb-2">
@@ -213,6 +197,22 @@ export function Suggestions({ plan, onUpgrade, onAddShow }: SuggestionsProps) {
                   </div>
 
                   <p className="text-sm text-text-secondary mb-4 leading-relaxed">{suggestion.why}</p>
+
+                  {/* Trailer embed — shown below description */}
+                  {trailers[index] && (
+                    <div className="relative pt-[56.25%] bg-black rounded-xl overflow-hidden mb-4">
+                      <iframe
+                        className="absolute inset-0 w-full h-full"
+                        src={`https://www.youtube.com/embed/${trailers[index]}?autoplay=0`}
+                        title={`${suggestion.title} trailer`}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  )}
+                  {trailers[index] === null && (
+                    <p className="text-xs text-text-muted mb-4">No trailer found</p>
+                  )}
 
                   {/* Actions */}
                   <div className="flex gap-2">
