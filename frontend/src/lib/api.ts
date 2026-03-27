@@ -37,6 +37,8 @@ export const showsApi = {
     api.get(`/shows/${showId}/episodes${season ? `?season=${season}` : ''}`),
   updateEpisode: (showId: string, epId: string, watched: boolean) =>
     api.put(`/shows/${showId}/episodes/${epId}`, { watched }),
+  markAllWatched: (showId: string) =>
+    api.put(`/shows/${showId}/episodes/watched`, {}),
 };
 
 export const tmdbApi = {

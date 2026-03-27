@@ -175,6 +175,27 @@ router.post('/:id/episodes', async (req: AuthRequest, res: Response): Promise<vo
   res.status(201).json({ message: 'Episodes saved' });
 });
 
+// PUT /api/shows/:id/episodes/watched - mark ALL episodes for a show as watched
+router.put('/:id/episodes/watched', async (req: AuthRequest, res: Response): Promise<void> => {
+  const { id } = req.params;
+  const client = createUserClient(req.accessToken!);
+
+  const { data: show, error: showError } = await client
+    .from('shows')
+    .select('id')
+    .eq('id', id)
+    .eq('user_id', req.userId)
+    .single();
+
+  if (showError || !show) {
+    res.status(404).json({ error: 'Show not found' });
+    return;
+  }
+
+  await client.from('episodes').update({ watched: true }).eq('show_id', id);
+  res.json({ ok: true });
+});
+
 // PUT /api/shows/:id/episodes/:epId - toggle watched
 router.put('/:id/episodes/:epId', async (req: AuthRequest, res: Response): Promise<void> => {
   const { id, epId } = req.params;

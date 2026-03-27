@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Plus, Search, ChevronDown, ChevronUp, Check, X, Tv2, Edit2, Trash2, RefreshCw } from 'lucide-react';
+import { Plus, Search, ChevronDown, ChevronUp, Check, X, Tv2, Edit2, Trash2, RefreshCw, Play } from 'lucide-react';
 import { Show, Service, TmdbSearchResult, TmdbEpisode, Episode } from '../../types';
 import { showsApi, tmdbApi } from '../../lib/api';
 import { ServiceIcon } from '../../components/ServiceIcon';
@@ -300,6 +300,41 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
     } catch { /* ignore */ }
   };
 
+  const setShowWatching = async (show: Show) => {
+    try {
+      await showsApi.update(show.id, { status: 'watching' });
+      await onRefresh();
+    } catch { /* ignore */ }
+  };
+
+  const markAllSeasonsWatched = async (show: Show) => {
+    if (!show.tmdb_id || !show.total_seasons) return;
+    // Load any missing seasons from TMDB first
+    for (let s = 1; s <= show.total_seasons; s++) {
+      const existing = await showsApi.getEpisodes(show.id, s).then(r => r.data).catch(() => []);
+      if (!existing || existing.length === 0) {
+        try {
+          const { data } = await tmdbApi.getSeason(show.tmdb_id, s);
+          const eps = data.episodes || [];
+          if (eps.length > 0) {
+            await showsApi.saveEpisodes(show.id, eps.map((ep: { season_number: number; episode_number: number; name: string; air_date: string }) => ({
+              season_number: ep.season_number,
+              episode_number: ep.episode_number,
+              title: ep.name,
+              air_date: ep.air_date,
+              watched: false,
+            })));
+          }
+        } catch { /* ignore */ }
+      }
+    }
+    // Now mark everything watched in one call
+    await showsApi.markAllWatched(show.id);
+    // Refresh local episode state for the current season
+    const season = activeSeason[show.id] || show.current_season || 1;
+    await loadEpisodes(show.id, season);
+  };
+
   const markSeasonWatched = async (show: Show) => {
     const episodes = episodesMap[show.id] || [];
     const unwatched = episodes.filter(ep => !ep.watched);
@@ -346,7 +381,10 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
       plan={plan} onToggleExpand={() => toggleExpand(show)} onEdit={() => openEdit(show)}
       onDelete={() => setDeleteConfirm(show.id)} onToggleEpisode={(ep) => toggleEpisode(show, ep)}
       onSeasonChange={(s) => handleSeasonChange(show, s)} onLoadTmdb={(s) => loadTmdbEpisodes(show, s)}
-      onMarkSeasonWatched={() => markSeasonWatched(show)} statusColors={statusColors}
+      onMarkSeasonWatched={() => markSeasonWatched(show)}
+      onSetWatching={() => setShowWatching(show)}
+      onMarkAllSeasonsWatched={() => markAllSeasonsWatched(show)}
+      statusColors={statusColors}
     />
   );
 
@@ -580,14 +618,17 @@ interface ShowRowProps {
   onSeasonChange: (season: number) => void;
   onLoadTmdb: (season: number) => void;
   onMarkSeasonWatched: () => void;
+  onSetWatching: () => void;
+  onMarkAllSeasonsWatched: () => void;
   statusColors: Record<string, string>;
 }
 
 function ShowRow({
   show, expanded, episodes, loadingEpisodes, activeSeason, plan,
   onToggleExpand, onEdit, onDelete, onToggleEpisode, onSeasonChange, onLoadTmdb,
-  onMarkSeasonWatched, statusColors,
+  onMarkSeasonWatched, onSetWatching, onMarkAllSeasonsWatched, statusColors,
 }: ShowRowProps) {
+  const isClosed = getCategory(show) === 'closed';
   const watchedCount = episodes.filter(e => e.watched).length;
   const progress = episodes.length > 0 ? Math.round((watchedCount / episodes.length) * 100) : 0;
 
@@ -618,6 +659,16 @@ function ShowRow({
         </div>
 
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {isClosed && (
+            <button
+              onClick={e => { e.stopPropagation(); onSetWatching(); }}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-accent-teal hover:bg-accent-teal/10 rounded-lg transition-colors"
+              title="I'm catching up on this show"
+            >
+              <Play size={11} />
+              Catching up
+            </button>
+          )}
           <button
             onClick={e => { e.stopPropagation(); onEdit(); }}
             className="p-1.5 text-text-muted hover:text-text-primary hover:bg-bg-hover rounded-lg"
@@ -640,6 +691,19 @@ function ShowRow({
       {/* Episode checklist */}
       {expanded && (
         <div className="px-5 pb-4 bg-bg-hover/20">
+          {/* Mark all seasons watched — closed shows only */}
+          {isClosed && show.total_seasons && show.total_seasons > 0 && (
+            <div className="flex items-center justify-between pt-3 pb-2 border-b border-bg-border mb-3">
+              <span className="text-xs text-text-muted">Finished the whole run?</span>
+              <button
+                onClick={onMarkAllSeasonsWatched}
+                className="flex items-center gap-1.5 text-xs text-accent-teal hover:text-accent-teal/80 font-medium transition-colors"
+              >
+                <Check size={12} />
+                Mark all seasons watched
+              </button>
+            </div>
+          )}
           {/* Season switcher */}
           {show.total_seasons && show.total_seasons > 1 && (
             <div className="flex items-center gap-2 mb-3 pt-2">
