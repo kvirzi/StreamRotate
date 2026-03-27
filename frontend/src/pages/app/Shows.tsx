@@ -175,7 +175,23 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
       if (editingShow) {
         await showsApi.update(editingShow.id, payload);
       } else {
-        await showsApi.create(payload);
+        const { data: newShow } = await showsApi.create(payload);
+        // Auto-save season 1 episodes from TMDB when a TMDB show is added
+        if (newShow?.id && payload.tmdb_id) {
+          try {
+            const { data: seasonData } = await tmdbApi.getSeason(payload.tmdb_id, 1);
+            const episodes = (seasonData.episodes || []) as TmdbEpisode[];
+            if (episodes.length > 0) {
+              await showsApi.saveEpisodes(newShow.id, episodes.map(ep => ({
+                season_number: ep.season_number,
+                episode_number: ep.episode_number,
+                title: ep.name,
+                air_date: ep.air_date,
+                watched: false,
+              })));
+            }
+          } catch { /* best-effort */ }
+        }
       }
       await onRefresh();
       setModalOpen(false);
@@ -199,28 +215,37 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
     const next = new Set(expandedShows);
     if (next.has(show.id)) {
       next.delete(show.id);
-    } else {
-      next.add(show.id);
-      if (!episodesMap[show.id]) {
-        await loadEpisodes(show.id, activeSeason[show.id] || show.current_season || 1);
+      setExpandedShows(next);
+      return;
+    }
+    next.add(show.id);
+    setExpandedShows(next);
+    const season = activeSeason[show.id] || show.current_season || 1;
+    const existing = episodesMap[show.id];
+    if (!existing || existing.length === 0) {
+      const fetched = await loadEpisodes(show.id, season);
+      // If DB has no episodes and we have a TMDB ID, auto-fetch from TMDB
+      if ((!fetched || fetched.length === 0) && show.tmdb_id) {
+        await loadTmdbEpisodes(show, season);
       }
     }
-    setExpandedShows(next);
   };
 
-  const loadEpisodes = async (showId: string, season: number) => {
+  const loadEpisodes = async (showId: string, season: number): Promise<Episode[]> => {
     const loadingNext = new Set(loadingEpisodes);
     loadingNext.add(showId);
     setLoadingEpisodes(loadingNext);
     try {
       const { data } = await showsApi.getEpisodes(showId, season);
       setEpisodesMap(prev => ({ ...prev, [showId]: data }));
+      return data as Episode[];
     } catch { /* ignore */ }
     finally {
       const loadingNext2 = new Set(loadingEpisodes);
       loadingNext2.delete(showId);
       setLoadingEpisodes(loadingNext2);
     }
+    return [];
   };
 
   const toggleEpisode = async (show: Show, episode: Episode) => {
@@ -236,7 +261,7 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
   };
 
   const loadTmdbEpisodes = async (show: Show, season: number) => {
-    if (!show.tmdb_id || plan !== 'pro') return;
+    if (!show.tmdb_id) return;
     try {
       const { data } = await tmdbApi.getSeason(show.tmdb_id, season);
       const episodes: Omit<TmdbEpisode, 'id' | 'overview' | 'still_path'>[] = data.episodes || [];
@@ -253,7 +278,10 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
 
   const handleSeasonChange = async (show: Show, season: number) => {
     setActiveSeason(prev => ({ ...prev, [show.id]: season }));
-    await loadEpisodes(show.id, season);
+    const fetched = await loadEpisodes(show.id, season);
+    if ((!fetched || fetched.length === 0) && show.tmdb_id) {
+      await loadTmdbEpisodes(show, season);
+    }
   };
 
   // Group shows by service
@@ -379,7 +407,7 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
               <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
               <input
                 className="w-full pl-10 pr-3.5 py-2.5 bg-bg-secondary border border-bg-border rounded-xl text-text-primary placeholder-text-muted text-sm focus:outline-none focus:border-accent-orange/60 transition-colors"
-                placeholder={plan === 'pro' ? 'Search TMDB or type a title...' : 'Show title'}
+                placeholder="Search TMDB or type a title..."
                 value={searchQuery}
                 onChange={e => handleSearchInput(e.target.value)}
               />
@@ -551,18 +579,16 @@ function ShowRow({
           </button>
         </div>
 
-        {plan === 'pro' && (
-          <button
-            onClick={onToggleExpand}
-            className="p-1.5 text-text-muted hover:text-text-primary hover:bg-bg-hover rounded-lg ml-1"
-          >
-            {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
-        )}
+        <button
+          onClick={onToggleExpand}
+          className="p-1.5 text-text-muted hover:text-text-primary hover:bg-bg-hover rounded-lg ml-1"
+        >
+          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
       </div>
 
-      {/* Episode checklist (Pro) */}
-      {expanded && plan === 'pro' && (
+      {/* Episode checklist */}
+      {expanded && (
         <div className="px-5 pb-4 bg-bg-hover/20">
           {/* Season switcher */}
           {show.total_seasons && show.total_seasons > 1 && (
