@@ -279,10 +279,10 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
       );
       setEpisodesMap(prev => ({ ...prev, [show.id]: updated }));
 
-      // If every loaded episode is now watched, clear the episodes_remaining counter
+      // If every loaded episode is now watched, mark done and clear counter
       const allWatched = updated.length > 0 && updated.every(ep => ep.watched);
       if (allWatched) {
-        try { await showsApi.update(show.id, { episodes_remaining: 0 }); } catch { /* ignore */ }
+        try { await showsApi.update(show.id, { status: 'done', episodes_remaining: 0 }); } catch { /* ignore */ }
         await onRefresh();
       }
     } catch { /* ignore */ }
@@ -355,8 +355,8 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
       ...prev,
       [show.id]: (prev[show.id] || []).map(ep => ({ ...ep, watched: true })),
     }));
-    // Clear the "episodes remaining" counter on the show itself and refresh
-    try { await showsApi.update(show.id, { episodes_remaining: 0 }); } catch { /* ignore */ }
+    // Mark done and clear the episodes remaining counter, then refresh
+    try { await showsApi.update(show.id, { status: 'done', episodes_remaining: 0 }); } catch { /* ignore */ }
     await onRefresh();
   };
 
