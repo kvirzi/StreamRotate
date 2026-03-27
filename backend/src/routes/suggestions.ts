@@ -26,6 +26,11 @@ async function getUserShowsContext(userId: string, accessToken: string): Promise
     .eq('user_id', userId)
     .eq('active', true);
 
+  const { data: dislikes } = await client
+    .from('show_dislikes')
+    .select('title')
+    .eq('user_id', userId);
+
   const showList = (shows || [])
     .map((s: { title: any; status: any; services: any }) =>
       `${s.title} (${s.status}) on ${(Array.isArray(s.services) ? s.services[0]?.name : s.services?.name) || 'unknown'}`
@@ -33,8 +38,9 @@ async function getUserShowsContext(userId: string, accessToken: string): Promise
     .join(', ');
 
   const serviceList = (services || []).map((s: { name: string }) => s.name).join(', ');
+  const dislikeList = (dislikes || []).map((d: { title: string }) => d.title).join(', ');
 
-  return `User's streaming services: ${serviceList || 'none'}. Current watchlist: ${showList || 'empty'}.`;
+  return `User's streaming services: ${serviceList || 'none'}. Current watchlist: ${showList || 'empty'}.${dislikeList ? ` Shows the user has tried and disliked (do NOT suggest these or similar shows): ${dislikeList}.` : ''}`;
 }
 
 // POST /api/suggestions
@@ -127,6 +133,26 @@ Return ONLY a JSON object, no other text:
   } catch (err) {
     console.error('Replace suggestion error:', err);
     res.status(500).json({ error: 'Failed to generate suggestion' });
+  }
+});
+
+// POST /api/suggestions/dislike
+router.post('/dislike', async (req: AuthRequest, res: Response): Promise<void> => {
+  const { title } = req.body;
+  if (!title) {
+    res.status(400).json({ error: 'title is required' });
+    return;
+  }
+  try {
+    const client = createUserClient(req.accessToken!);
+    // Upsert so duplicate dislikes don't pile up
+    await client
+      .from('show_dislikes')
+      .upsert({ user_id: req.userId, title }, { onConflict: 'user_id,title' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Dislike error:', err);
+    res.status(500).json({ error: 'Failed to save dislike' });
   }
 });
 

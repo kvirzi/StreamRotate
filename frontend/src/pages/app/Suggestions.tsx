@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sparkles, Plus, X, RefreshCw, Play, Lock, Check } from 'lucide-react';
+import { Sparkles, Plus, X, RefreshCw, Play, Lock, Check, ThumbsDown } from 'lucide-react';
 import { Suggestion } from '../../types';
 import { suggestionsApi, tmdbApi } from '../../lib/api';
 import { Button } from '../../components/Button';
@@ -20,6 +20,7 @@ export function Suggestions({ plan, onUpgrade, onAddShow }: SuggestionsProps) {
   const [dismissed, setDismissed] = useState<Set<number>>(new Set());
   const [adding, setAdding] = useState<Set<number>>(new Set());
   const [added, setAdded] = useState<Set<number>>(new Set());
+  const [disliking, setDisliking] = useState<Set<number>>(new Set());
   const [error, setError] = useState('');
 
   const fetchSuggestions = async () => {
@@ -62,6 +63,22 @@ export function Suggestions({ plan, onUpgrade, onAddShow }: SuggestionsProps) {
       const addingNext2 = new Set(adding);
       addingNext2.delete(index);
       setAdding(addingNext2);
+    }
+  };
+
+  const handleDislike = async (suggestion: Suggestion, index: number) => {
+    const next = new Set(disliking);
+    next.add(index);
+    setDisliking(next);
+    try {
+      await suggestionsApi.dislike(suggestion.title);
+      // Replace the card after a brief moment
+      setTimeout(() => replaceSuggestion(index), 400);
+    } catch { /* ignore */ }
+    finally {
+      const next2 = new Set(disliking);
+      next2.delete(index);
+      setDisliking(next2);
     }
   };
 
@@ -225,11 +242,24 @@ export function Suggestions({ plan, onUpgrade, onAddShow }: SuggestionsProps) {
                       onClick={() => replaceSuggestion(index)}
                       disabled={replacing === index}
                       className="px-3 py-1.5 rounded-lg bg-bg-hover border border-bg-border text-text-secondary hover:text-text-primary transition-colors flex items-center disabled:opacity-50"
+                      title="Show me something else"
                     >
                       {replacing === index ? (
                         <Spinner className="w-3 h-3" />
                       ) : (
                         <RefreshCw size={13} />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => handleDislike(suggestion, index)}
+                      disabled={disliking.has(index)}
+                      className="px-3 py-1.5 rounded-lg bg-bg-hover border border-bg-border text-text-secondary hover:text-red-400 hover:border-red-900/40 transition-colors flex items-center disabled:opacity-50"
+                      title="I've tried this and didn't like it"
+                    >
+                      {disliking.has(index) ? (
+                        <Spinner className="w-3 h-3" />
+                      ) : (
+                        <ThumbsDown size={13} />
                       )}
                     </button>
                   </div>

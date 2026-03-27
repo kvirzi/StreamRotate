@@ -51,6 +51,7 @@ export const suggestionsApi = {
   get: () => api.post('/suggestions'),
   replace: (existing: unknown[], index: number) =>
     api.post('/suggestions/replace', { existing, index }),
+  dislike: (title: string) => api.post('/suggestions/dislike', { title }),
 };
 
 export const waitlistApi = {
