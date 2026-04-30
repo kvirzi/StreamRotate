@@ -1,5 +1,5 @@
-import { useState, FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, FormEvent, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Tv2, RotateCcw, Bell, Sparkles, Check, ArrowRight,
   DollarSign, List, Zap, Play
@@ -7,8 +7,22 @@ import {
 import { waitlistApi } from '../lib/api';
 import { Logo } from '../components/Logo';
 import { Button } from '../components/Button';
+import { supabase } from '../lib/supabase';
 
 export function Landing() {
+  const navigate = useNavigate();
+
+  // If the user is already authenticated (e.g. returning from OAuth), send them straight to the app
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) navigate('/app', { replace: true });
+    });
+    // Also listen for the OAuth callback token arriving in the hash
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) navigate('/app', { replace: true });
+    });
+    return () => subscription.unsubscribe();
+  }, [navigate]);
   const [waitlistEmail, setWaitlistEmail] = useState('');
   const [waitlistLoading, setWaitlistLoading] = useState(false);
   const [waitlistMessage, setWaitlistMessage] = useState('');
