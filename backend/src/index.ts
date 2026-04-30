@@ -18,6 +18,8 @@ app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:4173',
+  'https://streamrotate.com',
+  'https://www.streamrotate.com',
   ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
 ];
 
