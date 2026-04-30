@@ -8,6 +8,7 @@ import tmdbRouter from './routes/tmdb';
 import suggestionsRouter from './routes/suggestions';
 import waitlistRouter from './routes/waitlist';
 import stripeRouter from './routes/stripe';
+import notifyRouter from './routes/notify';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -46,6 +47,7 @@ app.use('/api/tmdb', tmdbRouter); // No auth needed — key is server-side
 app.use('/api/suggestions', requireAuth, suggestionsRouter);
 app.use('/api/waitlist', waitlistRouter);
 app.use('/api/stripe', stripeRouter);
+app.use('/api/notify', notifyRouter);
 
 // 404 handler
 app.use((_req, res) => {

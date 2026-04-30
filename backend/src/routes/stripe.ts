@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import Stripe from 'stripe';
 import { supabaseAdmin } from '../lib/supabase';
 import { AuthRequest, requireAuth } from '../middleware/auth';
+import { notifyNewPayment } from '../lib/email';
 
 const router = Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -109,6 +110,18 @@ router.post('/webhook', async (req: Request, res: Response): Promise<void> => {
           .from('users')
           .update({ plan: isActive ? 'pro' : 'free' })
           .eq('stripe_customer_id', customerId);
+
+        // Send owner notification on new active subscription
+        if (event.type === 'customer.subscription.created' && isActive) {
+          try {
+            const customer = await stripe.customers.retrieve(customerId) as Stripe.Customer;
+            const priceId = subscription.items.data[0]?.price?.id;
+            const isAnnual = priceId === process.env.STRIPE_PRO_ANNUAL_PRICE_ID;
+            const plan = isAnnual ? 'Annual Pro' : 'Monthly Pro';
+            const amount = isAnnual ? '$59.99/year' : '$5.99/month';
+            await notifyNewPayment(customer.email || 'unknown', plan, amount);
+          } catch { /* best-effort */ }
+        }
         break;
       }
       case 'customer.subscription.deleted': {
