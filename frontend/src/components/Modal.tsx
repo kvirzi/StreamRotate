@@ -33,12 +33,12 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 overflow-y-auto"
       onClick={onClose}
     >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
-        className={`relative w-full ${widths[size]} bg-bg-card border border-bg-border rounded-2xl shadow-2xl fade-in`}
+        className={`relative w-full ${widths[size]} bg-bg-card border border-bg-border rounded-2xl shadow-2xl fade-in my-4 sm:my-0`}
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-5 border-b border-bg-border">
