@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Plus, Search, ChevronDown, ChevronUp, Check, X, Tv2, Edit2, Trash2, RefreshCw, Play } from 'lucide-react';
+import { Plus, Search, ChevronDown, ChevronUp, Check, X, Tv2, Edit2, Trash2, RefreshCw, Play, Calendar } from 'lucide-react';
 import { Show, Service, TmdbSearchResult, TmdbEpisode, Episode } from '../../types';
 import { showsApi, tmdbApi } from '../../lib/api';
 import { ServiceIcon } from '../../components/ServiceIcon';
@@ -41,14 +41,26 @@ const EMPTY_FORM: ShowFormData = {
 
 const ENDED_STATUSES = new Set(['Ended', 'Canceled', 'Cancelled']);
 
-type ShowCategory = 'live' | 'offseason' | 'closed';
+type ShowCategory = 'live' | 'upcoming' | 'offseason' | 'closed';
 const getCategory = (show: { tv_status: string | null; next_air_date: string | null; status: string }): ShowCategory => {
   if (show.status === 'watching') return 'live';
   if (show.tv_status && ENDED_STATUSES.has(show.tv_status)) return 'closed';
   // If user marked done and we have no TMDB status, treat as closed
   if (show.status === 'done' && !show.tv_status) return 'closed';
+  // Has a known future air date — surface in Coming Soon
+  if (show.next_air_date) {
+    const airDate = new Date(show.next_air_date + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (airDate >= today) return 'upcoming';
+  }
   if (show.tv_status === 'Returning Series' && !show.next_air_date) return 'offseason';
   return 'live';
+};
+
+const formatAirDate = (dateStr: string): string => {
+  const date = new Date(dateStr + 'T00:00:00');
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -404,11 +416,18 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
 
   const renderShowGroup = (groupShows: Show[]) => {
     const live = groupShows.filter(s => getCategory(s) === 'live');
+    const upcoming = groupShows.filter(s => getCategory(s) === 'upcoming');
     const offseason = groupShows.filter(s => getCategory(s) === 'offseason');
     const closed = groupShows.filter(s => getCategory(s) === 'closed');
     return (
       <>
         {live.map(renderShowRow)}
+        {upcoming.length > 0 && (
+          <>
+            <SectionDivider label="Coming Soon" />
+            {upcoming.map(renderShowRow)}
+          </>
+        )}
         {offseason.length > 0 && (
           <>
             <SectionDivider label="Off Season" />
