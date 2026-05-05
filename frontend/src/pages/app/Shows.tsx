@@ -683,10 +683,20 @@ function ShowRow({
               {show.status}
             </span>
           </div>
-          {show.total_seasons && (
-            <p className="text-xs text-text-muted">
-              Season {show.current_season || 1}{show.total_seasons > 1 ? ` of ${show.total_seasons}` : ''}
-              {show.episodes_remaining > 0 && ` · ${show.episodes_remaining} ep left`}
+          {(show.total_seasons || show.next_air_date) && (
+            <p className="text-xs text-text-muted flex items-center gap-1.5 flex-wrap">
+              {show.total_seasons && (
+                <span>Season {show.current_season || 1}{show.total_seasons > 1 ? ` of ${show.total_seasons}` : ''}{show.episodes_remaining > 0 ? ` · ${show.episodes_remaining} ep left` : ''}</span>
+              )}
+              {show.next_air_date && getCategory(show) === 'upcoming' && (
+                <>
+                  {show.total_seasons && <span>·</span>}
+                  <span className="flex items-center gap-1 text-accent-orange">
+                    <Calendar size={10} />
+                    Returns {formatAirDate(show.next_air_date)}
+                  </span>
+                </>
+              )}
             </p>
           )}
         </div>
