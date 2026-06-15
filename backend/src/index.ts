@@ -21,6 +21,8 @@ const allowedOrigins = [
   'http://localhost:4173',
   'https://streamrotate.com',
   'https://www.streamrotate.com',
+  'capacitor://localhost',
+  'ionic://localhost',
   ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
 ];
 
