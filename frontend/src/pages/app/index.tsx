@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import { Sidebar, type AppPage } from '../../components/Sidebar';
 import { Dashboard } from './Dashboard';
 import { Services } from './Services';
@@ -17,6 +18,7 @@ import { Button } from '../../components/Button';
 import { stripeApi } from '../../lib/api';
 import { showsApi } from '../../lib/api';
 import { tmdbApi } from '../../lib/api';
+import { initIAP, purchasePro, restorePurchases, getProStatus } from '../../lib/iap';
 
 export function AppPage() {
   const [page, setPage] = useState<AppPage>('dashboard');
@@ -45,17 +47,32 @@ export function AppPage() {
 
   useEffect(() => {
     if (user) {
-      // Check plan from user metadata or app_metadata
       const userPlan = (user.app_metadata?.plan || user.user_metadata?.plan || 'free') as 'free' | 'pro';
       setPlan(userPlan);
+      if (Capacitor.isNativePlatform()) {
+        initIAP(user.id).then(() => {
+          getProStatus().then(isPro => { if (isPro) setPlan('pro'); });
+        });
+      }
     }
   }, [user]);
 
   const handleUpgrade = async () => {
     setCheckoutLoading(true);
     try {
-      const { data } = await stripeApi.checkout(upgradePlan);
-      window.location.href = data.url;
+      if (Capacitor.isNativePlatform()) {
+        const result = await purchasePro(upgradePlan);
+        if (result === 'success') {
+          setPlan('pro');
+          setUpgradeModal(false);
+        } else if (result === 'error') {
+          alert('Purchase failed. Please try again.');
+        }
+        // 'cancelled' = user dismissed sheet, do nothing
+      } else {
+        const { data } = await stripeApi.checkout(upgradePlan);
+        window.location.href = data.url;
+      }
     } catch {
       alert('Unable to start checkout. Please try again.');
     } finally {
@@ -154,7 +171,7 @@ export function AppPage() {
       />
 
       {/* Main content */}
-      <main className="flex-1 md:ml-60 p-4 md:p-8 min-h-screen">
+      <main className="flex-1 md:ml-60 min-h-screen overflow-x-hidden p-4 md:p-8 mobile-main-padding">
         <div className="max-w-6xl mx-auto">
           {page === 'dashboard' && (
             <Dashboard
@@ -201,6 +218,7 @@ export function AppPage() {
               userEmail={user.email}
               plan={plan}
               onUpgrade={() => setUpgradeModal(true)}
+              onPlanChange={setPlan}
             />
           )}
           {page === 'support' && <SupportUs />}

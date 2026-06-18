@@ -1,20 +1,24 @@
 import { useState } from 'react';
-import { Settings as SettingsIcon, CreditCard, User, ExternalLink, Trash2 } from 'lucide-react';
+import { Settings as SettingsIcon, CreditCard, User, ExternalLink, Trash2, RotateCcw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { stripeApi } from '../../lib/api';
+import { restorePurchases } from '../../lib/iap';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Modal } from '../../components/Modal';
 import { useNavigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 
 interface SettingsPageProps {
   userEmail?: string;
   plan: 'free' | 'pro';
   onUpgrade: () => void;
+  onPlanChange?: (plan: 'free' | 'pro') => void;
 }
 
-export function SettingsPage({ userEmail, plan, onUpgrade }: SettingsPageProps) {
+export function SettingsPage({ userEmail, plan, onUpgrade, onPlanChange }: SettingsPageProps) {
   const [portalLoading, setPortalLoading] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' });
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
@@ -43,6 +47,11 @@ export function SettingsPage({ userEmail, plan, onUpgrade }: SettingsPageProps) 
   };
 
   const handleManageBilling = async () => {
+    if (Capacitor.isNativePlatform()) {
+      // On iOS, subscriptions are managed in the OS Settings app
+      window.open('https://apps.apple.com/account/subscriptions', '_blank');
+      return;
+    }
     setPortalLoading(true);
     try {
       const { data } = await stripeApi.portal();
@@ -51,6 +60,23 @@ export function SettingsPage({ userEmail, plan, onUpgrade }: SettingsPageProps) 
       alert('Unable to open billing portal. Please try again.');
     } finally {
       setPortalLoading(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    setRestoring(true);
+    try {
+      const isPro = await restorePurchases();
+      if (isPro) {
+        onPlanChange?.('pro');
+        alert('Purchase restored! You now have Pro access.');
+      } else {
+        alert('No active Pro subscription found.');
+      }
+    } catch {
+      alert('Restore failed. Please try again.');
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -142,11 +168,27 @@ export function SettingsPage({ userEmail, plan, onUpgrade }: SettingsPageProps) 
             <h2 className="font-display font-semibold text-text-primary">Billing</h2>
           </div>
           <p className="text-sm text-text-secondary mb-4">
-            Manage your Pro subscription, update payment method, or cancel anytime.
+            {Capacitor.isNativePlatform()
+              ? 'Manage your subscription in iOS Settings → Apple ID → Subscriptions.'
+              : 'Manage your Pro subscription, update payment method, or cancel anytime.'}
           </p>
           <Button onClick={handleManageBilling} loading={portalLoading} variant="secondary" className="gap-2">
             <ExternalLink size={14} />
-            Manage Billing
+            {Capacitor.isNativePlatform() ? 'View Subscriptions' : 'Manage Billing'}
+          </Button>
+        </div>
+      )}
+
+      {/* Restore Purchases (iOS only) */}
+      {Capacitor.isNativePlatform() && plan === 'free' && (
+        <div className="bg-bg-card border border-bg-border rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <RotateCcw size={16} className="text-accent-teal" />
+            <h2 className="font-display font-semibold text-text-primary">Restore Purchases</h2>
+          </div>
+          <p className="text-sm text-text-muted mb-4">Already subscribed? Restore your Pro access.</p>
+          <Button onClick={handleRestore} loading={restoring} variant="secondary">
+            Restore Purchases
           </Button>
         </div>
       )}
