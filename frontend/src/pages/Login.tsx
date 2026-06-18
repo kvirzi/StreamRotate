@@ -1,6 +1,9 @@
 import { useState, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
+import { SignInWithApple } from '@capacitor-community/apple-sign-in';
 import { Logo } from '../components/Logo';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
@@ -26,17 +29,48 @@ export function Login() {
     }
   };
 
+  const handleApple = async () => {
+    setError('');
+    try {
+      const result = await SignInWithApple.authorize({
+        clientId: 'com.streamrotate.app',
+        redirectURI: 'com.streamrotate.app://app',
+        scopes: 'email name',
+      });
+      const { identityToken } = result.response;
+      const { error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: identityToken,
+      });
+      if (error) setError(error.message);
+      else navigate('/app');
+    } catch (e: any) {
+      if (e?.code !== 'ASAuthorizationErrorCanceled') setError('Apple sign in failed');
+    }
+  };
+
   const handleGoogle = async () => {
     setGoogleLoading(true);
     setError('');
-    const { error } = await supabase.auth.signInWithOAuth({
+    const redirectTo = Capacitor.isNativePlatform()
+      ? 'com.streamrotate.app://app'
+      : `${window.location.origin}/app`;
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/app` },
+      options: {
+        redirectTo,
+        skipBrowserRedirect: Capacitor.isNativePlatform(),
+      },
     });
     if (error) {
       setError(error.message);
       setGoogleLoading(false);
+      return;
     }
+    if (Capacitor.isNativePlatform() && data?.url) {
+      await Browser.open({ url: data.url, windowName: '_self' });
+    }
+    setGoogleLoading(false);
   };
 
   return (
@@ -48,6 +82,19 @@ export function Login() {
         </div>
 
         <div className="bg-bg-card border border-bg-border rounded-2xl p-6 shadow-2xl">
+          {/* Sign in with Apple (native only) */}
+          {Capacitor.isNativePlatform() && (
+            <button
+              onClick={handleApple}
+              className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white border border-bg-border rounded-xl text-sm font-medium text-black transition-all mb-3"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="black">
+                <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.42c1.32.07 2.23.73 3 .78 1.13-.22 2.21-.94 3.42-.84 1.44.12 2.53.72 3.23 1.83-2.94 1.75-2.26 5.61.45 6.7-.57 1.56-1.3 3.11-2.1 4.39zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+              </svg>
+              Sign in with Apple
+            </button>
+          )}
+
           {/* Google OAuth */}
           <button
             onClick={handleGoogle}

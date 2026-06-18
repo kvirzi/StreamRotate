@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { Settings as SettingsIcon, CreditCard, User, Bell, ExternalLink } from 'lucide-react';
+import { Settings as SettingsIcon, CreditCard, User, ExternalLink, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { stripeApi } from '../../lib/api';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
+import { Modal } from '../../components/Modal';
+import { useNavigate } from 'react-router-dom';
 
 interface SettingsPageProps {
   userEmail?: string;
@@ -17,6 +19,28 @@ export function SettingsPage({ userEmail, plan, onUpgrade }: SettingsPageProps) 
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const navigate = useNavigate();
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        await fetch(`${import.meta.env.VITE_API_URL}/api/account`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+      }
+      await supabase.auth.signOut();
+      navigate('/');
+    } catch {
+      alert('Failed to delete account. Please contact support.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const handleManageBilling = async () => {
     setPortalLoading(true);
@@ -151,17 +175,36 @@ export function SettingsPage({ userEmail, plan, onUpgrade }: SettingsPageProps) 
           <p>Built to help you watch smarter and cancel on time.</p>
           <p className="mt-2">
             Show data powered by{' '}
-            <a
-              href="https://www.themoviedb.org"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-accent-teal hover:underline"
-            >
+            <a href="https://www.themoviedb.org" target="_blank" rel="noopener noreferrer" className="text-accent-teal hover:underline">
               TMDB
+            </a>
+          </p>
+          <p className="mt-1">
+            <a href="https://streamrotate.com/privacy" target="_blank" rel="noopener noreferrer" className="text-accent-teal hover:underline">
+              Privacy Policy
             </a>
           </p>
         </div>
       </div>
+
+      {/* Delete Account */}
+      <div className="bg-bg-card border border-red-900/30 rounded-2xl p-5">
+        <div className="flex items-center gap-2 mb-2">
+          <Trash2 size={16} className="text-red-400" />
+          <h2 className="font-display font-semibold text-red-400">Delete Account</h2>
+        </div>
+        <p className="text-sm text-text-muted mb-4">Permanently delete your account and all associated data. This cannot be undone.</p>
+        <Button variant="danger" onClick={() => setDeleteConfirm(true)}>Delete My Account</Button>
+      </div>
+
+      <Modal open={deleteConfirm} onClose={() => setDeleteConfirm(false)} title="Delete Account" size="sm">
+        <p className="text-text-secondary text-sm mb-2">This will permanently delete your account and all your data including services, shows, and billing history.</p>
+        <p className="text-red-400 text-sm font-medium mb-5">This action cannot be undone.</p>
+        <div className="flex gap-3">
+          <Button variant="secondary" onClick={() => setDeleteConfirm(false)} className="flex-1">Cancel</Button>
+          <Button variant="danger" onClick={handleDeleteAccount} loading={deleting} className="flex-1">Delete Forever</Button>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import suggestionsRouter from './routes/suggestions';
 import waitlistRouter from './routes/waitlist';
 import stripeRouter from './routes/stripe';
 import notifyRouter from './routes/notify';
+import accountRouter from './routes/account';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -50,6 +51,7 @@ app.use('/api/suggestions', requireAuth, suggestionsRouter);
 app.use('/api/waitlist', waitlistRouter);
 app.use('/api/stripe', stripeRouter);
 app.use('/api/notify', notifyRouter);
+app.use('/api/account', requireAuth, accountRouter);
 
 // 404 handler
 app.use((_req, res) => {
