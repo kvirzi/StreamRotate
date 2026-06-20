@@ -258,8 +258,8 @@ export function AppPage() {
                   : 'border-bg-border hover:border-bg-border/80'
               }`}
             >
-              <p className="font-display font-bold text-text-primary">$3/mo</p>
-              <p className="text-xs text-text-muted mt-0.5">Monthly</p>
+              <p className="font-display font-bold text-text-primary">$2.99/mo</p>
+              <p className="text-xs text-text-muted mt-0.5">Monthly · auto-renews</p>
             </button>
             <button
               onClick={() => setUpgradePlan('annual')}
@@ -274,8 +274,8 @@ export function AppPage() {
                   Save 44%
                 </span>
               </div>
-              <p className="font-display font-bold text-text-primary">$20/yr</p>
-              <p className="text-xs text-text-muted mt-0.5">Annual</p>
+              <p className="font-display font-bold text-text-primary">$19.99/yr</p>
+              <p className="text-xs text-text-muted mt-0.5">Annual · auto-renews</p>
             </button>
           </div>
 
@@ -287,7 +287,14 @@ export function AppPage() {
           >
             Upgrade Now
           </Button>
-          <p className="text-xs text-center text-text-muted">Cancel anytime. No commitments.</p>
+          <p className="text-xs text-center text-text-muted">
+            Subscription auto-renews. Cancel anytime in iOS Settings.
+          </p>
+          <p className="text-xs text-center text-text-muted">
+            <a href="https://streamrotate.com/privacy" target="_blank" rel="noopener noreferrer" className="text-accent-teal hover:underline">Privacy Policy</a>
+            {' · '}
+            <a href="https://streamrotate.com/terms" target="_blank" rel="noopener noreferrer" className="text-accent-teal hover:underline">Terms of Use</a>
+          </p>
         </div>
       </Modal>
     </div>
