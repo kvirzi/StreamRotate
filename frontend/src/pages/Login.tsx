@@ -2,8 +2,7 @@ import { useState, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Capacitor } from '@capacitor/core';
-import { Browser } from '@capacitor/browser';
-import { SignInWithApple } from '@capacitor-community/apple-sign-in';
+import { signInWithApple, signInWithGoogle } from '../lib/appleAuth';
 import { Logo } from '../components/Logo';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
@@ -31,45 +30,17 @@ export function Login() {
 
   const handleApple = async () => {
     setError('');
-    try {
-      const result = await SignInWithApple.authorize({
-        clientId: 'com.streamrotate.app',
-        redirectURI: 'com.streamrotate.app://app',
-        scopes: 'email name',
-      });
-      const { identityToken } = result.response;
-      const { error } = await supabase.auth.signInWithIdToken({
-        provider: 'apple',
-        token: identityToken,
-      });
-      if (error) setError(error.message);
-      else navigate('/app');
-    } catch (e: any) {
-      if (e?.code !== 'ASAuthorizationErrorCanceled') setError('Apple sign in failed');
-    }
+    const result = await signInWithApple();
+    if (result === 'cancelled') return;
+    if (result) setError(result);
+    else navigate('/app');
   };
 
   const handleGoogle = async () => {
     setGoogleLoading(true);
     setError('');
-    const redirectTo = Capacitor.isNativePlatform()
-      ? 'com.streamrotate.app://app'
-      : `${window.location.origin}/app`;
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo,
-        skipBrowserRedirect: Capacitor.isNativePlatform(),
-      },
-    });
-    if (error) {
-      setError(error.message);
-      setGoogleLoading(false);
-      return;
-    }
-    if (Capacitor.isNativePlatform() && data?.url) {
-      await Browser.open({ url: data.url, windowName: '_self' });
-    }
+    const err = await signInWithGoogle();
+    if (err) setError(err);
     setGoogleLoading(false);
   };
 
