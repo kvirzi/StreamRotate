@@ -186,6 +186,7 @@ export function AppPage() {
               shows={shows}
               onRefresh={refreshServices}
               plan={plan}
+              onUpgrade={() => setUpgradeModal(true)}
             />
           )}
           {page === 'shows' && (

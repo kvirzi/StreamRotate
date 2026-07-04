@@ -13,6 +13,7 @@ interface ServicesProps {
   shows: Show[];
   onRefresh: () => void;
   plan: 'free' | 'pro';
+  onUpgrade: () => void;
 }
 
 interface ServiceFormData {
@@ -36,7 +37,7 @@ const POPULAR_SERVICES = [
   'Peacock', 'Paramount+', 'Crunchyroll', 'YouTube TV',
 ];
 
-export function Services({ services, shows, onRefresh, plan }: ServicesProps) {
+export function Services({ services, shows, onRefresh, plan, onUpgrade }: ServicesProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [form, setForm] = useState<ServiceFormData>(EMPTY_FORM);
@@ -131,7 +132,11 @@ export function Services({ services, shows, onRefresh, plan }: ServicesProps) {
         <div className="bg-accent-purple/10 border border-accent-purple/30 rounded-xl p-4 flex items-center gap-3">
           <Wifi size={16} className="text-accent-purple flex-shrink-0" />
           <p className="text-sm text-accent-purple">
-            Free plan is limited to {FREE_LIMIT} services. <strong>Upgrade to Pro</strong> for unlimited services.
+            Free plan is limited to {FREE_LIMIT} services.{' '}
+            <button onClick={onUpgrade} className="underline font-semibold hover:text-accent-purple/80">
+              Upgrade to Pro
+            </button>{' '}
+            for unlimited services.
           </p>
         </div>
       )}
