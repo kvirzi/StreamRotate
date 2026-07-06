@@ -18,24 +18,60 @@ export async function initIAP(userId: string) {
   initialized = true;
 }
 
-export async function purchasePro(plan: 'monthly' | 'annual'): Promise<'success' | 'cancelled' | 'error'> {
-  try {
-    const offerings = await Purchases.getOfferings();
-    const current = offerings.current;
-    if (!current) return 'error';
+export type PurchaseResult =
+  | { status: 'success' }
+  | { status: 'cancelled' }
+  | { status: 'error'; message: string };
 
-    const pkg = current.availablePackages.find((p: { product: { identifier: string } }) =>
-      p.product.identifier === PRODUCT_IDS[plan]
-    );
-    if (!pkg) return 'error';
+export async function purchasePro(
+  plan: 'monthly' | 'annual',
+  userId?: string,
+): Promise<PurchaseResult> {
+  try {
+    // Make sure the SDK is configured (in case init hasn't finished yet).
+    if (!initialized && userId) await initIAP(userId);
+
+    const wantedId = PRODUCT_IDS[plan];
+    const offerings = await Purchases.getOfferings();
+
+    // Prefer the "current" offering, but fall back to ANY offering that
+    // contains our product — the current offering may not be set in the
+    // RevenueCat dashboard, which would otherwise leave `current` null.
+    const candidateOfferings = [
+      offerings.current,
+      ...Object.values(offerings.all || {}),
+    ].filter(Boolean) as { availablePackages: any[] }[];
+
+    let pkg: any = null;
+    for (const off of candidateOfferings) {
+      pkg = off.availablePackages.find(p => p.product?.identifier === wantedId);
+      if (pkg) break;
+    }
+
+    // Last resort: match by package type if the product id lookup failed.
+    if (!pkg) {
+      const wantType = plan === 'monthly' ? 'MONTHLY' : 'ANNUAL';
+      for (const off of candidateOfferings) {
+        pkg = off.availablePackages.find(p => p.packageType === wantType);
+        if (pkg) break;
+      }
+    }
+
+    if (!pkg) {
+      return { status: 'error', message: 'Subscription options are unavailable right now. Please try again later.' };
+    }
 
     const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg });
-    const isActive = customerInfo.activeSubscriptions.includes(PRODUCT_IDS[plan]) ||
-      customerInfo.entitlements.active['pro'] !== undefined;
-    return isActive ? 'success' : 'error';
+    const isActive = customerInfo.entitlements.active['pro'] !== undefined ||
+      customerInfo.activeSubscriptions.includes(wantedId);
+    return isActive
+      ? { status: 'success' }
+      : { status: 'error', message: 'Purchase completed but Pro is not active yet. Try Restore Purchases.' };
   } catch (e: any) {
-    if (e?.code === '1' || e?.userCancelled) return 'cancelled';
-    return 'error';
+    if (e?.code === '1' || e?.userCancelled || e?.userInfo?.readableErrorCode === 'PurchaseCancelledError') {
+      return { status: 'cancelled' };
+    }
+    return { status: 'error', message: e?.message || 'Purchase failed. Please try again.' };
   }
 }
 

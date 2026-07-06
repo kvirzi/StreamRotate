@@ -61,12 +61,12 @@ export function AppPage() {
     setCheckoutLoading(true);
     try {
       if (Capacitor.isNativePlatform()) {
-        const result = await purchasePro(upgradePlan);
-        if (result === 'success') {
+        const result = await purchasePro(upgradePlan, user?.id);
+        if (result.status === 'success') {
           setPlan('pro');
           setUpgradeModal(false);
-        } else if (result === 'error') {
-          alert('Purchase failed. Please try again.');
+        } else if (result.status === 'error') {
+          alert(result.message);
         }
         // 'cancelled' = user dismissed sheet, do nothing
       } else {
