@@ -1,6 +1,10 @@
 import { Heart, Coffee, DollarSign, Star, LucideIcon } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 
 export function SupportUs() {
+  // Apple guideline 3.1.1 forbids collecting donations outside In-App Purchase,
+  // so the external payment links are hidden on iOS/native builds.
+  const showDonationLinks = !Capacitor.isNativePlatform();
   return (
     <div className="space-y-6 fade-in max-w-2xl">
       <div>
@@ -15,37 +19,41 @@ export function SupportUs() {
         <h2 className="font-display font-bold text-xl text-text-primary mb-2">StreamRotate is indie-built</h2>
         <p className="text-text-secondary text-sm leading-relaxed max-w-md mx-auto">
           Made by a developer who wanted to stop forgetting about streaming services.
-          If StreamRotate helps you save money or watch more intentionally, consider buying me a coffee!
+          {showDonationLinks
+            ? 'If StreamRotate helps you save money or watch more intentionally, consider buying me a coffee!'
+            : 'If StreamRotate helps you save money or watch more intentionally, upgrading to Pro directly supports development.'}
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <SupportCard
-          icon={DollarSign}
-          title="Venmo"
-          handle="@kvirzi"
-          color="text-accent-teal"
-          bgColor="bg-accent-teal/15"
-          href="https://venmo.com/kvirzi"
-        />
-        <SupportCard
-          icon={DollarSign}
-          title="Cash App"
-          handle="$kvirzi"
-          color="text-green-400"
-          bgColor="bg-green-900/20"
-          href="https://cash.app/$kvirzi"
-        />
-        <SupportCard
-          icon={Coffee}
-          title="Buy Me a Coffee"
-          handle="Link coming soon"
-          color="text-yellow-400"
-          bgColor="bg-yellow-900/20"
-          href={undefined}
-          disabled
-        />
-      </div>
+      {showDonationLinks && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <SupportCard
+            icon={DollarSign}
+            title="Venmo"
+            handle="@kvirzi"
+            color="text-accent-teal"
+            bgColor="bg-accent-teal/15"
+            href="https://venmo.com/kvirzi"
+          />
+          <SupportCard
+            icon={DollarSign}
+            title="Cash App"
+            handle="$kvirzi"
+            color="text-green-400"
+            bgColor="bg-green-900/20"
+            href="https://cash.app/$kvirzi"
+          />
+          <SupportCard
+            icon={Coffee}
+            title="Buy Me a Coffee"
+            handle="Link coming soon"
+            color="text-yellow-400"
+            bgColor="bg-yellow-900/20"
+            href={undefined}
+            disabled
+          />
+        </div>
+      )}
 
       <div className="bg-bg-card border border-bg-border rounded-2xl p-5">
         <div className="flex items-center gap-2 mb-4">
