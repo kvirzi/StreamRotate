@@ -19,6 +19,7 @@ import { stripeApi } from '../../lib/api';
 import { showsApi } from '../../lib/api';
 import { tmdbApi } from '../../lib/api';
 import { initIAP, purchasePro, restorePurchases, getProStatus } from '../../lib/iap';
+import { syncEpisodeNotifications } from '../../lib/notifications';
 
 export function AppPage() {
   const [page, setPage] = useState<AppPage>('dashboard');
@@ -37,6 +38,13 @@ export function AppPage() {
   useEffect(() => {
     if (!authLoading && !user) navigate('/login');
   }, [authLoading, user, navigate]);
+
+  // Schedule local notifications for upcoming episode air dates (iOS only).
+  useEffect(() => {
+    if (!showsLoading && shows.length) {
+      syncEpisodeNotifications(shows);
+    }
+  }, [shows, showsLoading]);
 
   useEffect(() => {
     if (searchParams.get('upgraded') === 'true') {

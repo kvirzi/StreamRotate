@@ -63,7 +63,7 @@ export function Landing() {
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary font-body">
       {/* Nav */}
-      <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-bg-border">
+      <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-bg-border" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <Logo size="md" />
           <div className="flex items-center gap-3">
@@ -81,7 +81,7 @@ export function Landing() {
       </nav>
 
       {/* Hero */}
-      <section className="hero-gradient pt-28 pb-20 px-4 sm:px-6">
+      <section className="hero-gradient pb-20 px-4 sm:px-6" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 7rem)' }}>
         <div className="max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent-orange/10 border border-accent-orange/20 text-xs text-accent-orange font-medium mb-6">
             <Zap size={12} />
