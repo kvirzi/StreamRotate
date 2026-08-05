@@ -11,7 +11,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- Users (extends Supabase auth.users)
 CREATE TABLE IF NOT EXISTS public.users (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  email TEXT NOT NULL,
+  email TEXT,  -- nullable: Sign in with Apple "Hide My Email" may omit it
   created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
   stripe_customer_id TEXT UNIQUE,
   plan TEXT DEFAULT 'free' CHECK (plan IN ('free', 'pro')) NOT NULL
@@ -179,6 +179,8 @@ BEGIN
   VALUES (NEW.id, NEW.email)
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+  RETURN NEW;  -- never block auth signup if the profile row fails
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
