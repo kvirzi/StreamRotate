@@ -42,11 +42,18 @@ export async function signInWithApple(): Promise<string | null | 'cancelled'> {
       token: identityToken,
       nonce: rawNonce,
     });
-    if (error) return error.message;
+    if (error) return `Apple sign in failed: ${error.message}`;
     return null;
   } catch (e: any) {
-    if (e?.code === 'ASAuthorizationErrorCanceled' || e?.code === '1001') return 'cancelled';
-    return 'Apple sign in failed';
+    // User dismissed the native sheet — not an error worth showing.
+    const code = String(e?.code ?? '');
+    if (code === 'ASAuthorizationErrorCanceled' || code === '1001') return 'cancelled';
+    // Surface the real native error code/message so failures are diagnosable
+    // (App Review environments sometimes fail native Sign in with Apple).
+    // eslint-disable-next-line no-console
+    console.error('Apple sign in error', e);
+    const detail = e?.message || code || 'unknown error';
+    return `Apple sign in failed: ${detail}`;
   }
 }
 
