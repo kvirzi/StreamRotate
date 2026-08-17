@@ -254,7 +254,7 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
     }
     next.add(show.id);
     setExpandedShows(next);
-    const season = activeSeason[show.id] || show.current_season || 1;
+    const season = activeSeason[show.id] || show.total_seasons || show.current_season || 1;
     const existing = episodesMap[show.id];
     if (!existing || existing.length === 0) {
       const fetched = await loadEpisodes(show.id, season);
@@ -353,7 +353,7 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
     // Always refresh so UI reflects DB state
     await onRefresh();
     // Refresh local episode state for the current season
-    const season = activeSeason[show.id] || show.current_season || 1;
+    const season = activeSeason[show.id] || show.total_seasons || show.current_season || 1;
     await loadEpisodes(show.id, season);
   };
 
@@ -403,7 +403,7 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
   const renderShowRow = (show: Show) => (
     <ShowRow key={show.id} show={show}
       expanded={expandedShows.has(show.id)} episodes={episodesMap[show.id] || []}
-      loadingEpisodes={loadingEpisodes.has(show.id)} activeSeason={activeSeason[show.id] || show.current_season || 1}
+      loadingEpisodes={loadingEpisodes.has(show.id)} activeSeason={activeSeason[show.id] || show.total_seasons || show.current_season || 1}
       plan={plan} onToggleExpand={() => toggleExpand(show)} onEdit={() => openEdit(show)}
       onDelete={() => setDeleteConfirm(show.id)} onToggleEpisode={(ep) => toggleEpisode(show, ep)}
       onSeasonChange={(s) => handleSeasonChange(show, s)} onLoadTmdb={(s) => loadTmdbEpisodes(show, s)}
