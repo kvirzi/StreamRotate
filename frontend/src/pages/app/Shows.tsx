@@ -43,17 +43,18 @@ const ENDED_STATUSES = new Set(['Ended', 'Canceled', 'Cancelled']);
 
 type ShowCategory = 'live' | 'upcoming' | 'offseason' | 'closed';
 const getCategory = (show: { tv_status: string | null; next_air_date: string | null; status: string }): ShowCategory => {
-  if (show.status === 'watching') return 'live';
-  if (show.tv_status && ENDED_STATUSES.has(show.tv_status)) return 'closed';
-  // If user marked done and we have no TMDB status, treat as closed
-  if (show.status === 'done' && !show.tv_status) return 'closed';
-  // Has a known future air date — surface in Coming Soon
+  // A known future air date always wins — a new season is airing/coming even if
+  // the show was previously marked done or its TMDB status is stale ("Ended").
   if (show.next_air_date) {
     const airDate = new Date(show.next_air_date + 'T00:00:00');
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (airDate >= today) return 'upcoming';
   }
+  if (show.status === 'watching') return 'live';
+  if (show.tv_status && ENDED_STATUSES.has(show.tv_status)) return 'closed';
+  // If user marked done and we have no TMDB status, treat as closed
+  if (show.status === 'done' && !show.tv_status) return 'closed';
   if (show.tv_status === 'Returning Series' && !show.next_air_date) return 'offseason';
   return 'live';
 };
@@ -83,6 +84,26 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
   const [episodesMap, setEpisodesMap] = useState<Record<string, Episode[]>>({});
   const [loadingEpisodes, setLoadingEpisodes] = useState<Set<string>>(new Set());
   const [activeSeason, setActiveSeason] = useState<Record<string, number>>({});
+  const [refreshingMeta, setRefreshingMeta] = useState<Set<string>>(new Set());
+
+  // Re-pull current TMDB metadata (status, next air date, seasons) so shows with
+  // a new/active season stop showing as "done" or "ended" with stale data.
+  const refreshMeta = async (show: Show) => {
+    if (!show.tmdb_id) return;
+    setRefreshingMeta(prev => new Set(prev).add(show.id));
+    try {
+      const { data } = await tmdbApi.getShow(show.tmdb_id);
+      await showsApi.update(show.id, {
+        tv_status: data.status || null,
+        next_air_date: data.next_episode_to_air?.air_date || null,
+        total_seasons: data.number_of_seasons ?? show.total_seasons,
+      });
+      await onRefresh();
+    } catch { /* ignore */ }
+    finally {
+      setRefreshingMeta(prev => { const n = new Set(prev); n.delete(show.id); return n; });
+    }
+  };
 
   // TMDB search
   const [searchQuery, setSearchQuery] = useState('');
@@ -410,6 +431,7 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
       onMarkSeasonWatched={() => markSeasonWatched(show)}
       onSetWatching={() => setShowWatching(show)}
       onMarkAllSeasonsWatched={() => markAllSeasonsWatched(show)}
+      onRefreshMeta={() => refreshMeta(show)} refreshingMeta={refreshingMeta.has(show.id)}
       statusColors={statusColors}
     />
   );
@@ -653,13 +675,15 @@ interface ShowRowProps {
   onMarkSeasonWatched: () => void;
   onSetWatching: () => void;
   onMarkAllSeasonsWatched: () => void;
+  onRefreshMeta: () => void;
+  refreshingMeta: boolean;
   statusColors: Record<string, string>;
 }
 
 function ShowRow({
   show, expanded, episodes, loadingEpisodes, activeSeason, plan,
   onToggleExpand, onEdit, onDelete, onToggleEpisode, onSeasonChange, onLoadTmdb,
-  onMarkSeasonWatched, onSetWatching, onMarkAllSeasonsWatched, statusColors,
+  onMarkSeasonWatched, onSetWatching, onMarkAllSeasonsWatched, onRefreshMeta, refreshingMeta, statusColors,
 }: ShowRowProps) {
   const isClosed = getCategory(show) === 'closed';
   const watchedCount = episodes.filter(e => e.watched).length;
@@ -710,6 +734,16 @@ function ShowRow({
             >
               <Play size={11} />
               Catching up
+            </button>
+          )}
+          {show.tmdb_id && (
+            <button
+              onClick={e => { e.stopPropagation(); onRefreshMeta(); }}
+              disabled={refreshingMeta}
+              className="p-1.5 text-text-muted hover:text-accent-teal hover:bg-bg-hover rounded-lg disabled:opacity-50"
+              title="Refresh status & air dates from TMDB"
+            >
+              <RefreshCw size={14} className={refreshingMeta ? 'animate-spin' : ''} />
             </button>
           )}
           <button
