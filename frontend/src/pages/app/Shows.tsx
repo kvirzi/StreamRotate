@@ -812,7 +812,10 @@ function ShowRow({
                   // only when there is at least one aired episode above it.
                   const firstUnaired = episodes.findIndex(ep => !isAired(ep));
                   const dividerIdx = firstUnaired > 0 ? firstUnaired : -1;
-                  return episodes.map((ep, i) => (
+                  return episodes.map((ep, i) => {
+                    const isPremiere = i === 0;
+                    const isFinale = i === episodes.length - 1 && episodes.length > 1;
+                    return (
                     <Fragment key={ep.id}>
                       {i === dividerIdx && (
                         <div className="col-span-full flex items-center gap-2 my-1.5">
@@ -837,9 +840,20 @@ function ShowRow({
                         <span className={`text-xs truncate ${ep.watched ? 'text-text-muted line-through' : 'text-text-secondary'}`}>
                           {ep.episode_number}. {ep.title}
                         </span>
+                        {isPremiere && (
+                          <span className="ml-auto flex-shrink-0 text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-accent-teal/15 text-accent-teal">
+                            Premiere
+                          </span>
+                        )}
+                        {isFinale && (
+                          <span className="ml-auto flex-shrink-0 text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-accent-purple/15 text-accent-purple">
+                            Finale
+                          </span>
+                        )}
                       </button>
                     </Fragment>
-                  ));
+                    );
+                  });
                 })()}
               </div>
             </div>
