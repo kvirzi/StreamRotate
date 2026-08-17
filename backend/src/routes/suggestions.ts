@@ -45,8 +45,10 @@ async function getUserShowsContext(userId: string, accessToken: string): Promise
 
 // POST /api/suggestions
 router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
+  console.log(`SUGGESTIONS_HIT userId=${req.userId} keySet=${!!process.env.ANTHROPIC_API_KEY}`);
   try {
     const context = await getUserShowsContext(req.userId!, req.accessToken!);
+    console.log('SUGGESTIONS_CTX_OK calling AI');
 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-5',
