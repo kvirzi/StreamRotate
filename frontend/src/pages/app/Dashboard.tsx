@@ -3,6 +3,7 @@ import { DollarSign, Tv2, Play, CheckCircle, Trophy, Calendar, Clock, Zap, Lucid
 import { Service, Show } from '../../types';
 import { computeRotation, getDaysUntilBilling, getBillingUrgency } from '../../lib/rotation';
 import { ServiceIcon } from '../../components/ServiceIcon';
+import { EpisodeTimeline } from '../../components/EpisodeTimeline';
 
 interface DashboardProps {
   services: Service[];
@@ -91,6 +92,9 @@ export function Dashboard({ services, shows, onNavigate }: DashboardProps) {
           color="text-text-secondary"
         />
       </div>
+
+      {/* Episode timeline */}
+      <EpisodeTimeline shows={shows} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Watch Now card */}
