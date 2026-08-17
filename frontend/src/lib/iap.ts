@@ -10,11 +10,12 @@ let initialized = false;
 
 export async function initIAP(userId: string) {
   if (!Capacitor.isNativePlatform() || initialized) return;
+  const apiKey = Capacitor.getPlatform() === 'android'
+    ? import.meta.env.VITE_REVENUECAT_ANDROID_KEY
+    : import.meta.env.VITE_REVENUECAT_IOS_KEY;
+  if (!apiKey) return; // key not configured for this platform yet
   await Purchases.setLogLevel({ level: LOG_LEVEL.ERROR });
-  await Purchases.configure({
-    apiKey: import.meta.env.VITE_REVENUECAT_IOS_KEY,
-    appUserID: userId,
-  });
+  await Purchases.configure({ apiKey, appUserID: userId });
   initialized = true;
 }
 

@@ -53,8 +53,8 @@ export function Login() {
         </div>
 
         <div className="bg-bg-card border border-bg-border rounded-2xl p-6 shadow-2xl">
-          {/* Sign in with Apple (native only) */}
-          {Capacitor.isNativePlatform() && (
+          {/* Sign in with Apple (iOS only) */}
+          {Capacitor.getPlatform() === 'ios' && (
             <button
               onClick={handleApple}
               className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white border border-bg-border rounded-xl text-sm font-medium text-black transition-all mb-3"
