@@ -49,12 +49,10 @@ async function getUserShowsContext(userId: string, accessToken: string): Promise
 
 // POST /api/suggestions
 router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
-  console.log(`SUGGESTIONS_HIT userId=${req.userId} keySet=${!!process.env.ANTHROPIC_API_KEY}`);
   try {
     const context = await getUserShowsContext(req.userId!, req.accessToken!);
-    console.log('SUGGESTIONS_CTX_OK calling AI');
 
-    const aiCall = anthropic.messages.create({
+    const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5',
       max_tokens: 1024,
       messages: [
@@ -69,13 +67,6 @@ Return ONLY a JSON array with exactly 6 objects, no other text:
         },
       ],
     });
-    const message = await Promise.race([
-      aiCall,
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('MANUAL_TIMEOUT_20S: AI call never returned')), 20000),
-      ),
-    ]);
-    console.log('SUGGESTIONS_AI_RETURNED');
 
     const content = message.content[0];
     if (content.type !== 'text') {
