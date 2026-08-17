@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Sparkles, Plus, X, RefreshCw, Play, Lock, Check, ThumbsDown } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 import { Suggestion } from '../../types';
 import { suggestionsApi, tmdbApi } from '../../lib/api';
 import { Button } from '../../components/Button';
@@ -198,17 +200,27 @@ export function Suggestions({ plan, onUpgrade, onAddShow }: SuggestionsProps) {
 
                   <p className="text-sm text-text-secondary mb-4 leading-relaxed">{suggestion.why}</p>
 
-                  {/* Trailer embed — shown below description */}
+                  {/* Trailer — embed on web; open in-app browser on iOS (YouTube blocks
+                      embedded playback from the capacitor:// origin) */}
                   {trailers[index] && (
-                    <div className="relative pt-[56.25%] bg-black rounded-xl overflow-hidden mb-4">
-                      <iframe
-                        className="absolute inset-0 w-full h-full"
-                        src={`https://www.youtube.com/embed/${trailers[index]}?autoplay=0`}
-                        title={`${suggestion.title} trailer`}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>
+                    Capacitor.isNativePlatform() ? (
+                      <button
+                        onClick={() => Browser.open({ url: `https://www.youtube.com/watch?v=${trailers[index]}` })}
+                        className="w-full flex items-center justify-center gap-2 py-3 mb-4 rounded-xl bg-black/80 text-white text-sm font-medium hover:bg-black transition-colors"
+                      >
+                        <Play size={15} /> Watch trailer on YouTube
+                      </button>
+                    ) : (
+                      <div className="relative pt-[56.25%] bg-black rounded-xl overflow-hidden mb-4">
+                        <iframe
+                          className="absolute inset-0 w-full h-full"
+                          src={`https://www.youtube.com/embed/${trailers[index]}?autoplay=0`}
+                          title={`${suggestion.title} trailer`}
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        />
+                      </div>
+                    )
                   )}
                   {trailers[index] === null && (
                     <p className="text-xs text-text-muted mb-4">No trailer found</p>
