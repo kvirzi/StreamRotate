@@ -49,7 +49,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     const context = await getUserShowsContext(req.userId!, req.accessToken!);
 
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-5',
       max_tokens: 1024,
       messages: [
         {
@@ -99,7 +99,7 @@ router.post('/replace', async (req: AuthRequest, res: Response): Promise<void> =
     const existingTitles = existing.map((s: Suggestion) => s.title).join(', ');
 
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-5',
       max_tokens: 256,
       messages: [
         {
