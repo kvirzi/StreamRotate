@@ -55,7 +55,7 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     console.log('SUGGESTIONS_CTX_OK calling AI');
 
     const aiCall = anthropic.messages.create({
-      model: 'claude-sonnet-5',
+      model: 'claude-haiku-4-5',
       max_tokens: 1024,
       messages: [
         {
@@ -114,7 +114,7 @@ router.post('/replace', async (req: AuthRequest, res: Response): Promise<void> =
     const existingTitles = existing.map((s: Suggestion) => s.title).join(', ');
 
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-5',
+      model: 'claude-haiku-4-5',
       max_tokens: 256,
       messages: [
         {
