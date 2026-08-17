@@ -4,7 +4,11 @@ import { AuthRequest } from '../middleware/auth';
 import { createUserClient } from '../lib/supabase';
 
 const router = Router();
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  timeout: 25000, // fail within 25s instead of hanging
+  maxRetries: 1,
+});
 
 interface Suggestion {
   title: string;
