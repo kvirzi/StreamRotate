@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, Fragment } from 'react';
 import { Plus, Search, ChevronDown, ChevronUp, Check, X, Tv2, Edit2, Trash2, RefreshCw, Play, Calendar } from 'lucide-react';
 import { Show, Service, TmdbSearchResult, TmdbEpisode, Episode } from '../../types';
 import { showsApi, tmdbApi } from '../../lib/api';
@@ -752,7 +752,7 @@ function ShowRow({
             <div className="flex items-center gap-2 mb-3 pt-2">
               <span className="text-xs text-text-muted">Season:</span>
               <div className="flex gap-1 flex-wrap">
-                {Array.from({ length: show.total_seasons }, (_, i) => i + 1).map(s => (
+                {Array.from({ length: show.total_seasons }, (_, i) => show.total_seasons! - i).map(s => (
                   <button
                     key={s}
                     onClick={() => onSeasonChange(s)}
@@ -804,24 +804,43 @@ function ShowRow({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-48 overflow-y-auto">
-                {episodes.map(ep => (
-                  <button
-                    key={ep.id}
-                    onClick={() => onToggleEpisode(ep)}
-                    className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
-                      ep.watched ? 'bg-accent-teal/10' : 'hover:bg-bg-hover'
-                    }`}
-                  >
-                    <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-colors ${
-                      ep.watched ? 'bg-accent-teal border-accent-teal' : 'border-bg-border'
-                    }`}>
-                      {ep.watched && <Check size={10} className="text-white" />}
-                    </div>
-                    <span className={`text-xs truncate ${ep.watched ? 'text-text-muted line-through' : 'text-text-secondary'}`}>
-                      {ep.episode_number}. {ep.title}
-                    </span>
-                  </button>
-                ))}
+                {(() => {
+                  const nowMs = Date.now();
+                  const isAired = (ep: Episode) =>
+                    !ep.air_date || new Date(`${ep.air_date}T00:00:00`).getTime() <= nowMs;
+                  // Index of the first not-yet-aired episode; show the divider before it
+                  // only when there is at least one aired episode above it.
+                  const firstUnaired = episodes.findIndex(ep => !isAired(ep));
+                  const dividerIdx = firstUnaired > 0 ? firstUnaired : -1;
+                  return episodes.map((ep, i) => (
+                    <Fragment key={ep.id}>
+                      {i === dividerIdx && (
+                        <div className="col-span-full flex items-center gap-2 my-1.5">
+                          <div className="flex-1 h-px bg-accent-orange/40" />
+                          <span className="text-[10px] font-semibold text-accent-orange uppercase tracking-wide">
+                            Yet to air
+                          </span>
+                          <div className="flex-1 h-px bg-accent-orange/40" />
+                        </div>
+                      )}
+                      <button
+                        onClick={() => onToggleEpisode(ep)}
+                        className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
+                          ep.watched ? 'bg-accent-teal/10' : 'hover:bg-bg-hover'
+                        }`}
+                      >
+                        <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-colors ${
+                          ep.watched ? 'bg-accent-teal border-accent-teal' : 'border-bg-border'
+                        }`}>
+                          {ep.watched && <Check size={10} className="text-white" />}
+                        </div>
+                        <span className={`text-xs truncate ${ep.watched ? 'text-text-muted line-through' : 'text-text-secondary'}`}>
+                          {ep.episode_number}. {ep.title}
+                        </span>
+                      </button>
+                    </Fragment>
+                  ));
+                })()}
               </div>
             </div>
           ) : (
