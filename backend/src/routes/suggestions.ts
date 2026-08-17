@@ -80,6 +80,8 @@ Return ONLY a JSON array with exactly 6 objects, no other text:
     const suggestions: Suggestion[] = JSON.parse(jsonMatch[0]);
     res.json(suggestions);
   } catch (err) {
+    const e = err as { status?: number; error?: { type?: string }; name?: string; message?: string };
+    console.error(`SUGGESTIONS_FAIL status=${e?.status} type=${e?.error?.type || e?.name} msg=${e?.message}`);
     console.error('Suggestions error:', err);
     res.status(500).json({ error: 'Failed to generate suggestions' });
   }
