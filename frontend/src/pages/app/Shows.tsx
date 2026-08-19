@@ -874,16 +874,23 @@ function ShowRow({
                         <span className={`text-xs truncate ${ep.watched ? 'text-text-muted line-through' : 'text-text-secondary'}`}>
                           {ep.episode_number}. {ep.title}
                         </span>
-                        {isPremiere && (
-                          <span className="ml-auto flex-shrink-0 text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-accent-teal/15 text-accent-teal">
-                            Premiere
-                          </span>
-                        )}
-                        {isFinale && (
-                          <span className="ml-auto flex-shrink-0 text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-accent-purple/15 text-accent-purple">
-                            Finale
-                          </span>
-                        )}
+                        <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
+                          {ep.air_date && (
+                            <span className="text-[10px] text-text-muted">
+                              {new Date(`${ep.air_date}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: '2-digit' })}
+                            </span>
+                          )}
+                          {isPremiere && (
+                            <span className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-accent-teal/15 text-accent-teal">
+                              Premiere
+                            </span>
+                          )}
+                          {isFinale && (
+                            <span className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-accent-purple/15 text-accent-purple">
+                              Finale
+                            </span>
+                          )}
+                        </div>
                       </button>
                     </Fragment>
                     );
