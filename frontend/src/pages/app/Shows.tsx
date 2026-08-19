@@ -500,10 +500,10 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
   };
 
   const statusColors: Record<string, string> = {
-    watching: 'bg-accent-teal/20 text-accent-teal',
+    watching: 'bg-green-500/20 text-green-400',   // go
     queued: 'bg-bg-hover text-text-muted',
-    done: 'bg-green-900/20 text-green-400',
-    waiting: 'bg-accent-orange/15 text-accent-orange',
+    waiting: 'bg-yellow-500/20 text-yellow-500',  // slow
+    done: 'bg-red-500/20 text-red-400',           // stop
   };
 
   return (
@@ -752,9 +752,9 @@ function ShowRow({
         className="flex items-center gap-3 px-5 py-3.5 group hover:bg-bg-hover/30 transition-colors cursor-pointer"
       >
         <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-          displayStatus === 'watching' ? 'bg-accent-teal' :
-          displayStatus === 'done' ? 'bg-green-500' :
-          displayStatus === 'waiting' ? 'bg-accent-orange' : 'bg-bg-border'
+          displayStatus === 'watching' ? 'bg-green-500' :
+          displayStatus === 'waiting' ? 'bg-yellow-500' :
+          displayStatus === 'done' ? 'bg-red-500' : 'bg-bg-border'
         }`} />
 
         <div className="flex-1 min-w-0">
