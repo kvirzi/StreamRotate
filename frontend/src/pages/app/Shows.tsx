@@ -723,7 +723,13 @@ function ShowRow({
 }: ShowRowProps) {
   // Only offer seasons that have started airing (TMDB lists future seasons too).
   const seasonCount = airedSeasons ?? show.total_seasons ?? 1;
-  const isClosed = getCategory(show) === 'closed';
+  const category = getCategory(show);
+  const isClosed = category === 'closed';
+  // A show marked "done" isn't really done once a new season is airing/coming —
+  // reflect that in the status dot & badge without touching the stored value.
+  const displayStatus = (category === 'live' || category === 'upcoming') && show.status === 'done'
+    ? 'watching'
+    : show.status;
   const watchedCount = episodes.filter(e => e.watched).length;
   const progress = episodes.length > 0 ? Math.round((watchedCount / episodes.length) * 100) : 0;
 
@@ -734,15 +740,15 @@ function ShowRow({
         className="flex items-center gap-3 px-5 py-3.5 group hover:bg-bg-hover/30 transition-colors cursor-pointer"
       >
         <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-          show.status === 'watching' ? 'bg-accent-teal' :
-          show.status === 'done' ? 'bg-green-500' : 'bg-bg-border'
+          displayStatus === 'watching' ? 'bg-accent-teal' :
+          displayStatus === 'done' ? 'bg-green-500' : 'bg-bg-border'
         }`} />
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium text-text-primary truncate">{show.title}</p>
-            <span className={`badge text-[10px] ${statusColors[show.status]}`}>
-              {show.status}
+            <span className={`badge text-[10px] ${statusColors[displayStatus]}`}>
+              {displayStatus}
             </span>
           </div>
           {(show.total_seasons || show.next_air_date) && (
