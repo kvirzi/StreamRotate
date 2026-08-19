@@ -92,23 +92,31 @@ export function EpisodeTimeline({ shows }: EpisodeTimelineProps) {
         </div>
 
         {/* Show rows */}
-        {data.items.map((item, i) => (
-          <div key={item.id} className="absolute left-0 right-0" style={{ top: `${28 + i * 34}px` }}>
-            <div
-              className="absolute flex items-center gap-1.5 -translate-y-1/2"
-              style={{
-                left: `${item.left}%`,
-                transform: `translate(${item.left > 60 ? '-100%' : '0'}, -50%)`,
-              }}
-            >
-              <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${item.aired ? 'bg-bg-border' : 'bg-accent-teal'}`} />
-              <span className={`text-xs whitespace-nowrap ${item.aired ? 'text-text-muted' : 'text-text-primary'}`}>
+        {data.items.map((item, i) => {
+          // Labels flip to the LEFT of the dot when the dot is near the right edge,
+          // so the text never overflows — but the dot itself always stays at the
+          // true date position (relative to the "Now" line).
+          const labelLeft = item.left > 55;
+          return (
+            <div key={item.id} className="absolute left-0 right-0" style={{ top: `${28 + i * 34}px` }}>
+              {/* Dot — anchored at the exact date position */}
+              <div
+                className={`absolute w-2.5 h-2.5 rounded-full -translate-x-1/2 -translate-y-1/2 ${item.aired ? 'bg-bg-border' : 'bg-accent-teal'}`}
+                style={{ left: `${item.left}%` }}
+              />
+              {/* Label — to the right of the dot, or to its left when near the edge */}
+              <span
+                className={`absolute -translate-y-1/2 whitespace-nowrap text-xs ${labelLeft ? 'text-right' : ''} ${item.aired ? 'text-text-muted' : 'text-text-primary'}`}
+                style={labelLeft
+                  ? { right: `${100 - item.left}%`, marginRight: '10px' }
+                  : { left: `${item.left}%`, marginLeft: '10px' }}
+              >
                 {item.title}
                 <span className="text-text-muted ml-1">· {item.dateLabel}</span>
               </span>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="flex items-center gap-4 mt-2 text-[11px] text-text-muted">
