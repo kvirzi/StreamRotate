@@ -499,10 +499,11 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
     );
   };
 
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     watching: 'bg-accent-teal/20 text-accent-teal',
     queued: 'bg-bg-hover text-text-muted',
     done: 'bg-green-900/20 text-green-400',
+    waiting: 'bg-accent-orange/15 text-accent-orange',
   };
 
   return (
@@ -725,11 +726,22 @@ function ShowRow({
   const seasonCount = airedSeasons ?? show.total_seasons ?? 1;
   const category = getCategory(show);
   const isClosed = category === 'closed';
-  // A show marked "done" isn't really done once a new season is airing/coming —
-  // reflect that in the status dot & badge without touching the stored value.
-  const displayStatus = (category === 'live' || category === 'upcoming') && show.status === 'done'
-    ? 'watching'
-    : show.status;
+  // Derive a clear display state from the show's real airing status:
+  //   watching = a season is currently airing
+  //   waiting  = caught up, between seasons (next season announced/coming)
+  //   done     = the series is finished for good
+  const displayStatus = (() => {
+    if (show.status === 'queued') return 'queued';
+    if (category === 'closed') return 'done';
+    if (category === 'offseason') return 'waiting';
+    if (category === 'upcoming') {
+      // Next episode soon = the current season is still airing (watching);
+      // far off = between seasons (waiting).
+      const days = (new Date(`${show.next_air_date}T00:00:00`).getTime() - Date.now()) / 86400000;
+      return days <= 21 ? 'watching' : 'waiting';
+    }
+    return 'watching'; // live
+  })();
   const watchedCount = episodes.filter(e => e.watched).length;
   const progress = episodes.length > 0 ? Math.round((watchedCount / episodes.length) * 100) : 0;
 
@@ -741,7 +753,8 @@ function ShowRow({
       >
         <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
           displayStatus === 'watching' ? 'bg-accent-teal' :
-          displayStatus === 'done' ? 'bg-green-500' : 'bg-bg-border'
+          displayStatus === 'done' ? 'bg-green-500' :
+          displayStatus === 'waiting' ? 'bg-accent-orange' : 'bg-bg-border'
         }`} />
 
         <div className="flex-1 min-w-0">
