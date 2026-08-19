@@ -85,6 +85,9 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
   const [loadingEpisodes, setLoadingEpisodes] = useState<Set<string>>(new Set());
   const [activeSeason, setActiveSeason] = useState<Record<string, number>>({});
   const [refreshingMeta, setRefreshingMeta] = useState<Set<string>>(new Set());
+  // Per-show season info from TMDB: how many seasons have actually aired, and the
+  // next announced-but-unaired season (so we don't show empty future seasons).
+  const [seasonMeta, setSeasonMeta] = useState<Record<string, { airedSeasons: number; upcoming: { season: number; date: string | null } | null }>>({});
 
   // Re-pull current TMDB metadata (status, next air date, seasons) so shows with
   // a new/active season stop showing as "done" or "ended" with stale data.
@@ -275,7 +278,36 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
     }
     next.add(show.id);
     setExpandedShows(next);
-    const season = activeSeason[show.id] || show.total_seasons || show.current_season || 1;
+
+    // Figure out which seasons have actually aired (TMDB lists announced future
+    // seasons too), so we default to the latest AIRED season, not an empty one.
+    let season = activeSeason[show.id] || show.total_seasons || show.current_season || 1;
+    if (show.tmdb_id && !seasonMeta[show.id]) {
+      try {
+        const { data } = await tmdbApi.getShow(show.tmdb_id);
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const seasons = ((data.seasons || []) as { season_number: number; air_date: string | null }[])
+          .filter(s => s.season_number > 0);
+        const aired = seasons.filter(s => s.air_date && new Date(`${s.air_date}T00:00:00`) <= today);
+        const airedSeasons = aired.length ? Math.max(...aired.map(s => s.season_number)) : (show.total_seasons || 1);
+        const upcomingSeason = seasons.find(s => s.season_number > airedSeasons);
+        setSeasonMeta(prev => ({
+          ...prev,
+          [show.id]: {
+            airedSeasons,
+            upcoming: upcomingSeason ? { season: upcomingSeason.season_number, date: upcomingSeason.air_date || null } : null,
+          },
+        }));
+        if (!activeSeason[show.id]) {
+          season = airedSeasons;
+          setActiveSeason(prev => ({ ...prev, [show.id]: airedSeasons }));
+        }
+      } catch { /* ignore — fall back to stored season count */ }
+    } else if (seasonMeta[show.id] && !activeSeason[show.id]) {
+      season = seasonMeta[show.id].airedSeasons;
+      setActiveSeason(prev => ({ ...prev, [show.id]: seasonMeta[show.id].airedSeasons }));
+    }
+
     const existing = episodesMap[show.id];
     if (!existing || existing.length === 0) {
       const fetched = await loadEpisodes(show.id, season);
@@ -432,6 +464,7 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
       onSetWatching={() => setShowWatching(show)}
       onMarkAllSeasonsWatched={() => markAllSeasonsWatched(show)}
       onRefreshMeta={() => refreshMeta(show)} refreshingMeta={refreshingMeta.has(show.id)}
+      airedSeasons={seasonMeta[show.id]?.airedSeasons} upcomingSeason={seasonMeta[show.id]?.upcoming || null}
       statusColors={statusColors}
     />
   );
@@ -677,14 +710,19 @@ interface ShowRowProps {
   onMarkAllSeasonsWatched: () => void;
   onRefreshMeta: () => void;
   refreshingMeta: boolean;
+  airedSeasons?: number;
+  upcomingSeason: { season: number; date: string | null } | null;
   statusColors: Record<string, string>;
 }
 
 function ShowRow({
   show, expanded, episodes, loadingEpisodes, activeSeason, plan,
   onToggleExpand, onEdit, onDelete, onToggleEpisode, onSeasonChange, onLoadTmdb,
-  onMarkSeasonWatched, onSetWatching, onMarkAllSeasonsWatched, onRefreshMeta, refreshingMeta, statusColors,
+  onMarkSeasonWatched, onSetWatching, onMarkAllSeasonsWatched, onRefreshMeta, refreshingMeta,
+  airedSeasons, upcomingSeason, statusColors,
 }: ShowRowProps) {
+  // Only offer seasons that have started airing (TMDB lists future seasons too).
+  const seasonCount = airedSeasons ?? show.total_seasons ?? 1;
   const isClosed = getCategory(show) === 'closed';
   const watchedCount = episodes.filter(e => e.watched).length;
   const progress = episodes.length > 0 ? Math.round((watchedCount / episodes.length) * 100) : 0;
@@ -782,11 +820,11 @@ function ShowRow({
             </div>
           )}
           {/* Season switcher */}
-          {show.total_seasons && show.total_seasons > 1 && (
+          {seasonCount > 1 && (
             <div className="flex items-center gap-2 mb-3 pt-2">
               <span className="text-xs text-text-muted">Season:</span>
               <div className="flex gap-1 flex-wrap">
-                {Array.from({ length: show.total_seasons }, (_, i) => show.total_seasons! - i).map(s => (
+                {Array.from({ length: seasonCount }, (_, i) => seasonCount - i).map(s => (
                   <button
                     key={s}
                     onClick={() => onSeasonChange(s)}
@@ -809,6 +847,19 @@ function ShowRow({
                   Load from TMDB
                 </button>
               )}
+            </div>
+          )}
+
+          {/* Announced-but-not-yet-aired season */}
+          {upcomingSeason && (
+            <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-accent-purple/10 border border-accent-purple/20">
+              <Calendar size={13} className="text-accent-purple flex-shrink-0" />
+              <span className="text-xs text-accent-purple">
+                Season {upcomingSeason.season}{' '}
+                {upcomingSeason.date
+                  ? `premieres ${formatAirDate(upcomingSeason.date)}`
+                  : 'announced — date TBA'}
+              </span>
             </div>
           )}
 
