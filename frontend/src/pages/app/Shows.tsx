@@ -790,7 +790,7 @@ function ShowRow({
               title="I'm catching up on this show"
             >
               <Play size={11} />
-              Catching up
+              <span className="hidden sm:inline">Catching up</span>
             </button>
           )}
           {show.tmdb_id && (
