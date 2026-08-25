@@ -132,6 +132,7 @@ export async function runBillingReminders(targetDays: number[], onlyEmail?: stri
       serviceName: best.name,
       signupUrl: catalogSignupUrl(best.name),
       shows: ordered.slice(0, 3).map(s => s.title),
+      active: !best.inactive,
     };
   }
 

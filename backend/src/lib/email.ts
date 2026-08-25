@@ -44,11 +44,12 @@ export interface BillingReminderItem {
   cancel_url: string | null;
 }
 
-// The next service in the rotation to reactivate, with a few of its shows.
+// The next service in the rotation to watch, with a few of its shows.
 export interface NextUp {
   serviceName: string;
   signupUrl: string | null;
   shows: string[];
+  active: boolean; // already subscribed? → "jump back in" vs "reactivate"
 }
 
 function escapeHtml(s: string) {
@@ -100,15 +101,17 @@ export function buildBillingReminderEmail(
     const showList = nextUp.shows
       .map(t => `<div style="color:#e9e9f0;font-size:14px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.08)">▸ ${escapeHtml(t)}</div>`)
       .join('');
+    const ctaVerb = nextUp.active ? 'Jump back into' : 'Reactivate';
+    const subhead = nextUp.active ? 'Already subscribed — dig into these:' : 'Reactivate it and dig into these:';
     const signupBtn = nextUp.signupUrl
-      ? `<div style="margin-top:16px"><a href="${escapeHtml(nextUp.signupUrl)}" style="display:inline-block;background:#3db8a0;color:#04140f;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:700;font-size:14px">Reactivate ${escapeHtml(nextUp.serviceName)} →</a></div>`
+      ? `<div style="margin-top:16px"><a href="${escapeHtml(nextUp.signupUrl)}" style="display:inline-block;background:#3db8a0;color:#04140f;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:700;font-size:14px">${ctaVerb} ${escapeHtml(nextUp.serviceName)} →</a></div>`
       : '';
     nextUpBlock = `
       <table role="presentation" width="100%" style="border-collapse:separate;background:#161622;border-radius:16px;margin:22px 0">
         <tr><td style="padding:20px 22px">
           <div style="color:#8a8aa0;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase">Up next in your rotation</div>
           <div style="color:#ffffff;font-size:20px;font-weight:800;margin:6px 0 2px">${escapeHtml(nextUp.serviceName)}</div>
-          <div style="color:#8a8aa0;font-size:13px;margin-bottom:12px">Reactivate it and dig into these:</div>
+          <div style="color:#8a8aa0;font-size:13px;margin-bottom:12px">${subhead}</div>
           ${showList}
           ${signupBtn}
         </td></tr>
