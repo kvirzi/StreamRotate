@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import {
-  LayoutDashboard, Tv2, List, RotateCcw, Sparkles,
+  LayoutDashboard, Tv2, List, RotateCcw, Compass,
   Bell, Settings, Heart, LogOut, Menu, X, ChevronRight,
-  LucideIcon
+  MessageSquarePlus, LucideIcon
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Logo } from './Logo';
@@ -15,6 +15,7 @@ export type AppPage =
   | 'rotation'
   | 'suggestions'
   | 'reminders'
+  | 'feedback'
   | 'settings'
   | 'support';
 
@@ -29,8 +30,9 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'services', label: 'My Services', icon: Tv2 },
   { id: 'shows', label: 'My Shows', icon: List },
   { id: 'rotation', label: 'Rotation Plan', icon: RotateCcw },
-  { id: 'suggestions', label: 'Suggestions', icon: Sparkles },
+  { id: 'suggestions', label: 'Discover', icon: Compass },
   { id: 'reminders', label: 'Reminders', icon: Bell },
+  { id: 'feedback', label: 'Feedback', icon: MessageSquarePlus },
   { id: 'settings', label: 'Settings', icon: Settings },
   { id: 'support', label: 'Support Us', icon: Heart },
 ];

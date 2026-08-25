@@ -122,7 +122,7 @@ export function Suggestions({ plan, onUpgrade, onAddShow }: SuggestionsProps) {
           <div className="w-16 h-16 bg-accent-purple/15 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Lock size={28} className="text-accent-purple" />
           </div>
-          <h2 className="font-display font-bold text-xl text-text-primary mb-2">AI Suggestions</h2>
+          <h2 className="font-display font-bold text-xl text-text-primary mb-2">Discover</h2>
           <p className="text-text-secondary text-sm mb-6">
             Get personalized show recommendations powered by Claude AI, based on your current watchlist and services.
           </p>
@@ -139,8 +139,8 @@ export function Suggestions({ plan, onUpgrade, onAddShow }: SuggestionsProps) {
     <div className="space-y-6 fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display font-bold text-2xl text-text-primary">AI Suggestions</h1>
-          <p className="text-text-muted text-sm mt-0.5">Personalized recommendations based on your watchlist</p>
+          <h1 className="font-display font-bold text-2xl text-text-primary">Discover</h1>
+          <p className="text-text-muted text-sm mt-0.5">New shows picked for you, based on your watchlist</p>
         </div>
         <Button onClick={fetchSuggestions} loading={loading} className="gap-2">
           <Sparkles size={16} />

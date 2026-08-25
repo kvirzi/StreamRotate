@@ -64,3 +64,10 @@ export const stripeApi = {
   checkout: (plan: 'monthly' | 'annual') => api.post('/stripe/checkout', { plan }),
   portal: () => api.get('/stripe/portal'),
 };
+
+export const accountApi = {
+  getPreferences: () => api.get('/account/preferences'),
+  setPreferences: (data: { email_reminders: boolean }) => api.patch('/account/preferences', data),
+  sendFeedback: (category: string, message: string) =>
+    api.post('/account/feedback', { category, message }),
+};

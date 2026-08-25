@@ -8,6 +8,7 @@ import { Shows } from './Shows';
 import { RotationPlan } from './RotationPlan';
 import { Suggestions } from './Suggestions';
 import { Reminders } from './Reminders';
+import { Feedback } from './Feedback';
 import { SettingsPage } from './Settings';
 import { SupportUs } from './SupportUs';
 import { useAuth } from '../../hooks/useAuth';
@@ -222,6 +223,7 @@ export function AppPage() {
           {page === 'reminders' && (
             <Reminders services={services} />
           )}
+          {page === 'feedback' && <Feedback />}
           {page === 'settings' && (
             <SettingsPage
               userEmail={user.email}

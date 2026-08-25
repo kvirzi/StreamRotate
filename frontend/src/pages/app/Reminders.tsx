@@ -1,7 +1,9 @@
-import { Bell, ExternalLink, AlertTriangle, Clock, CheckCircle, Share2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Bell, ExternalLink, AlertTriangle, Clock, CheckCircle, Share2, Mail } from 'lucide-react';
 import { Service } from '../../types';
 import { ServiceIcon } from '../../components/ServiceIcon';
 import { getDaysUntilBilling, getBillingUrgency } from '../../lib/rotation';
+import { accountApi } from '../../lib/api';
 
 interface RemindersProps {
   services: Service[];
@@ -21,6 +23,8 @@ export function Reminders({ services }: RemindersProps) {
         <h1 className="font-display font-bold text-2xl text-text-primary">Billing Reminders</h1>
         <p className="text-text-muted text-sm mt-0.5">Stay on top of your subscription renewals</p>
       </div>
+
+      <EmailReminderToggle />
 
       {billableServices.length === 0 && freeServices.length === 0 ? (
         <div className="text-center py-16 bg-bg-card border border-bg-border rounded-2xl">
@@ -100,6 +104,54 @@ export function Reminders({ services }: RemindersProps) {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+// Toggle for opting in/out of the "renews soon" reminder emails.
+function EmailReminderToggle() {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    accountApi.getPreferences()
+      .then(res => setEnabled(res.data.email_reminders))
+      .catch(() => setEnabled(true));
+  }, []);
+
+  const toggle = async () => {
+    if (enabled === null || saving) return;
+    const next = !enabled;
+    setEnabled(next); // optimistic
+    setSaving(true);
+    try {
+      await accountApi.setPreferences({ email_reminders: next });
+    } catch {
+      setEnabled(!next); // revert on failure
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-3 bg-bg-card border border-bg-border rounded-2xl p-4">
+      <div className="w-9 h-9 rounded-xl bg-accent-teal/10 flex items-center justify-center flex-shrink-0">
+        <Mail size={18} className="text-accent-teal" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-text-primary">Email me before renewals</p>
+        <p className="text-xs text-text-muted">Get a heads-up a few days before a subscription renews, with a one-tap cancel link.</p>
+      </div>
+      <button
+        onClick={toggle}
+        disabled={enabled === null}
+        aria-pressed={!!enabled}
+        className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 disabled:opacity-50 ${
+          enabled ? 'bg-accent-teal' : 'bg-bg-border'
+        }`}
+      >
+        <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${enabled ? 'translate-x-5' : ''}`} />
+      </button>
     </div>
   );
 }

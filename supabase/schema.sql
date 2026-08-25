@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS public.users (
   email TEXT,  -- nullable: Sign in with Apple "Hide My Email" may omit it
   created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
   stripe_customer_id TEXT UNIQUE,
-  plan TEXT DEFAULT 'free' CHECK (plan IN ('free', 'pro')) NOT NULL
+  plan TEXT DEFAULT 'free' CHECK (plan IN ('free', 'pro')) NOT NULL,
+  email_reminders BOOLEAN DEFAULT true NOT NULL  -- opt-in to renewal reminder emails
 );
 
 -- Services

@@ -10,6 +10,7 @@ import waitlistRouter from './routes/waitlist';
 import stripeRouter from './routes/stripe';
 import notifyRouter from './routes/notify';
 import accountRouter from './routes/account';
+import { startScheduler } from './lib/scheduler';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -60,6 +61,7 @@ app.use((_req, res) => {
 
 app.listen(PORT, () => {
   console.log(`StreamRotate API running on port ${PORT}`);
+  startScheduler();
 });
 
 export default app;

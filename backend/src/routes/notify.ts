@@ -1,76 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { notifyNewSignup, sendBillingReminder, BillingReminderItem } from '../lib/email';
+import { notifyNewSignup } from '../lib/email';
 import { supabaseAdmin } from '../lib/supabase';
+import { runBillingReminders, verifyUnsubscribeToken } from '../lib/reminders';
 
 const router = Router();
-
-// Days until the next occurrence of a day-of-month billing date (mirrors the
-// frontend getDaysUntilBilling so reminders line up with the in-app countdown).
-function daysUntilBilling(billingDate: number | null): number | null {
-  if (!billingDate) return null;
-  const today = new Date();
-  const next = new Date(today.getFullYear(), today.getMonth(), billingDate);
-  if (next <= today) next.setMonth(next.getMonth() + 1);
-  return Math.ceil((next.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-// POST /api/notify/billing-reminders — daily cron target. Emails each user whose
-// active paid subscriptions renew in exactly one of the target day-counts.
-// Protected by the shared webhook secret. Configure the lead times with
-// ?days=3,1 (default 3). Run this once per day (e.g. Railway cron / cron-job.org).
-router.post('/billing-reminders', async (req: Request, res: Response): Promise<void> => {
-  const secret = req.headers['x-webhook-secret'];
-  if (!process.env.WEBHOOK_SECRET || secret !== process.env.WEBHOOK_SECRET) {
-    res.status(401).json({ error: 'Unauthorized' });
-    return;
-  }
-
-  const targetDays = String(req.query.days || '3')
-    .split(',')
-    .map(d => parseInt(d.trim(), 10))
-    .filter(d => Number.isFinite(d));
-
-  try {
-    const { data: services, error } = await supabaseAdmin
-      .from('services')
-      .select('user_id, name, cost_monthly, billing_date, cancel_url')
-      .eq('active', true)
-      .eq('is_free', false)
-      .not('billing_date', 'is', null);
-
-    if (error) throw error;
-
-    // Group matching services by user.
-    const byUser = new Map<string, BillingReminderItem[]>();
-    for (const s of services || []) {
-      const days = daysUntilBilling(s.billing_date);
-      if (days === null || !targetDays.includes(days)) continue;
-      const item: BillingReminderItem = {
-        name: s.name,
-        cost_monthly: s.cost_monthly,
-        days,
-        cancel_url: s.cancel_url,
-      };
-      const list = byUser.get(s.user_id) || [];
-      list.push(item);
-      byUser.set(s.user_id, list);
-    }
-
-    let emailed = 0;
-    for (const [userId, items] of byUser) {
-      const { data, error: uErr } = await supabaseAdmin.auth.admin.getUserById(userId);
-      const email = data?.user?.email;
-      if (uErr || !email) continue;
-      await sendBillingReminder(email, items);
-      emailed++;
-    }
-
-    res.json({ ok: true, targetDays, usersEmailed: emailed, servicesMatched: [...byUser.values()].flat().length });
-  } catch (err) {
-    console.error('Billing reminder error:', err);
-    res.status(500).json({ error: 'Reminder run failed' });
-  }
-});
 
 // POST /api/notify/signup — called by Supabase Auth webhook on new user INSERT
 router.post('/signup', async (req: Request, res: Response): Promise<void> => {
@@ -90,6 +23,56 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
     console.error('Signup notification error:', err);
     res.status(500).json({ error: 'Notification failed' });
   }
+});
+
+// POST /api/notify/billing-reminders — manual trigger for the daily reminder run.
+// The scheduler (src/lib/scheduler) also runs this automatically; this endpoint
+// is handy for testing / sending now. Protected by the shared webhook secret.
+// Configure lead times with ?days=3,1 (default 3).
+router.post('/billing-reminders', async (req: Request, res: Response): Promise<void> => {
+  const secret = req.headers['x-webhook-secret'];
+  if (!process.env.WEBHOOK_SECRET || secret !== process.env.WEBHOOK_SECRET) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+
+  const targetDays = String(req.query.days || '3')
+    .split(',')
+    .map(d => parseInt(d.trim(), 10))
+    .filter(d => Number.isFinite(d));
+
+  try {
+    const stats = await runBillingReminders(targetDays);
+    res.json({ ok: true, targetDays, ...stats });
+  } catch (err) {
+    console.error('Billing reminder error:', err);
+    res.status(500).json({ error: 'Reminder run failed' });
+  }
+});
+
+// GET /api/notify/unsubscribe?u=<userId>&t=<token> — one-click opt-out from the
+// email footer. Verifies the signed token, then flips the user's flag off.
+router.get('/unsubscribe', async (req: Request, res: Response): Promise<void> => {
+  const userId = String(req.query.u || '');
+  const token = String(req.query.t || '');
+  const ok = userId && token && verifyUnsubscribeToken(userId, token);
+
+  if (!ok) {
+    res.status(400).send('<p>Invalid or expired unsubscribe link.</p>');
+    return;
+  }
+
+  try {
+    await supabaseAdmin.from('users').update({ email_reminders: false }).eq('id', userId);
+  } catch (err) {
+    console.error('Unsubscribe error:', err);
+  }
+
+  res.send(`<!doctype html><html><body style="font-family:-apple-system,sans-serif;max-width:480px;margin:60px auto;text-align:center;color:#1a1a24">
+    <div style="font-size:22px;font-weight:700"><span style="color:#e8734a">Stream</span>Rotate</div>
+    <p style="margin-top:20px;font-size:16px">You've been unsubscribed from renewal reminder emails.</p>
+    <p style="color:#888;font-size:14px">You can turn them back on anytime in the app's Reminders tab.</p>
+  </body></html>`);
 });
 
 export default router;
