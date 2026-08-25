@@ -40,9 +40,10 @@ function unsubscribeUrl(userId: string): string {
  * lead times, and email them a renewal reminder (unless they've opted out).
  * Returns run stats. Shared by the daily cron and the manual HTTP endpoint.
  */
-export async function runBillingReminders(targetDays: number[], onlyEmail?: string): Promise<{
+export async function runBillingReminders(targetDays: number[], onlyEmail?: string, debug = false): Promise<{
   usersEmailed: number;
   servicesMatched: number;
+  debug?: any;
 }> {
   const { data: services, error } = await supabaseAdmin
     .from('services')
@@ -136,13 +137,29 @@ export async function runBillingReminders(targetDays: number[], onlyEmail?: stri
 
   let emailed = 0;
   let matched = 0;
+  const debugInfo: any[] = [];
   for (const [userId, { email, items }] of byUser) {
     matched += items.length;
     const renewingNames = new Set(items.map(i => i.name.toLowerCase()));
     const nextUp = pickNextUp(userId, renewingNames);
-    await sendBillingReminder(email, items, nextUp, unsubscribeUrl(userId));
-    emailed++;
+    if (debug) {
+      debugInfo.push({
+        email,
+        renewing: [...renewingNames],
+        services: (servicesByUser.get(userId) || []).map((svc: any) => ({
+          name: svc.name,
+          active: svc.active,
+          is_free: svc.is_free,
+          nonDoneShows: (showsByService.get(svc.id) || []).length,
+        })),
+        chosenNextUp: nextUp,
+      });
+    }
+    if (!debug) {
+      await sendBillingReminder(email, items, nextUp, unsubscribeUrl(userId));
+      emailed++;
+    }
   }
 
-  return { usersEmailed: emailed, servicesMatched: matched };
+  return { usersEmailed: emailed, servicesMatched: matched, ...(debug ? { debug: debugInfo } : {}) };
 }

@@ -42,9 +42,10 @@ router.post('/billing-reminders', async (req: Request, res: Response): Promise<v
     .filter(d => Number.isFinite(d));
 
   const onlyEmail = req.query.email ? String(req.query.email) : undefined;
+  const debug = req.query.debug === '1';
 
   try {
-    const stats = await runBillingReminders(targetDays, onlyEmail);
+    const stats = await runBillingReminders(targetDays, onlyEmail, debug);
     res.json({ ok: true, targetDays, onlyEmail: onlyEmail || null, ...stats });
   } catch (err) {
     console.error('Billing reminder error:', err);
