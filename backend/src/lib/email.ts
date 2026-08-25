@@ -35,3 +35,59 @@ export async function notifyNewPayment(userEmail: string, plan: string, amount: 
     `<h2>New paying customer!</h2><p><strong>${userEmail}</strong> just subscribed to the <strong>${plan}</strong> plan (${amount}).</p>`
   );
 }
+
+export interface BillingReminderItem {
+  name: string;
+  cost_monthly: number;
+  days: number;
+  cancel_url: string | null;
+}
+
+function escapeHtml(s: string) {
+  return s.replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string
+  ));
+}
+
+// User-facing email listing subscriptions renewing soon, each with a one-tap
+// cancel link so they can drop it before the charge hits.
+export async function sendBillingReminder(userEmail: string, items: BillingReminderItem[]) {
+  if (!items.length) return;
+  const soonest = Math.min(...items.map(i => i.days));
+  const total = items.reduce((sum, i) => sum + (Number(i.cost_monthly) || 0), 0);
+
+  const rows = items.map(i => {
+    const when = i.days === 0 ? 'today' : i.days === 1 ? 'tomorrow' : `in ${i.days} days`;
+    const cancelBtn = i.cancel_url
+      ? `<a href="${escapeHtml(i.cancel_url)}" style="display:inline-block;background:#e8734a;color:#fff;text-decoration:none;padding:8px 16px;border-radius:8px;font-weight:600;font-size:14px">Cancel ${escapeHtml(i.name)}</a>`
+      : `<span style="color:#888;font-size:13px">No cancel link saved</span>`;
+    return `<tr>
+      <td style="padding:14px 0;border-bottom:1px solid #eee">
+        <div style="font-weight:600;font-size:16px;color:#1a1a24">${escapeHtml(i.name)}</div>
+        <div style="color:#666;font-size:13px;margin-top:2px">$${Number(i.cost_monthly).toFixed(2)}/mo · renews ${when}</div>
+      </td>
+      <td style="padding:14px 0;border-bottom:1px solid #eee;text-align:right">${cancelBtn}</td>
+    </tr>`;
+  }).join('');
+
+  const subject = items.length === 1
+    ? `⏰ ${items[0].name} renews ${soonest === 0 ? 'today' : soonest === 1 ? 'tomorrow' : `in ${soonest} days`}`
+    : `⏰ ${items.length} subscriptions renewing soon`;
+
+  const html = `
+  <div style="max-width:520px;margin:0 auto;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1a1a24">
+    <div style="font-size:22px;font-weight:700;margin-bottom:4px"><span style="color:#e8734a">Stream</span>Rotate</div>
+    <p style="color:#444;font-size:15px;line-height:1.5">
+      Heads up — the ${items.length === 1 ? 'subscription below renews' : 'subscriptions below renew'} soon.
+      Still watching? Keep it. Not right now? Cancel in one tap and save it for later.
+    </p>
+    <table style="width:100%;border-collapse:collapse;margin:16px 0">${rows}</table>
+    <p style="color:#666;font-size:14px">Estimated monthly total: <strong>$${total.toFixed(2)}</strong></p>
+    <p style="color:#999;font-size:12px;margin-top:24px;border-top:1px solid #eee;padding-top:12px">
+      You're getting this because you track these services in StreamRotate.
+      Manage reminders anytime at <a href="https://streamrotate.com/app" style="color:#3db8a0">streamrotate.com</a>.
+    </p>
+  </div>`;
+
+  await sendEmail(userEmail, subject, html);
+}

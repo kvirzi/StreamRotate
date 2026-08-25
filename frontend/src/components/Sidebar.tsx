@@ -113,22 +113,29 @@ export function Sidebar({ currentPage, onPageChange, userEmail, plan = 'free' }:
         <NavContent />
       </aside>
 
-      {/* Mobile toggle */}
-      <button
-        onClick={() => setMobileOpen(true)}
-        className="md:hidden fixed top-4 left-4 z-40 p-2 rounded-xl bg-bg-card border border-bg-border text-text-secondary"
+      {/* Mobile top bar */}
+      <div
+        className="md:hidden fixed top-0 left-0 right-0 z-40 bg-bg-secondary border-b border-bg-border flex items-end"
+        style={{ paddingTop: 'env(safe-area-inset-top)', height: 'calc(env(safe-area-inset-top) + 52px)' }}
       >
-        <Menu size={20} />
-      </button>
+        <div className="flex items-center justify-between w-full px-4 pb-2">
+          <button onClick={() => setMobileOpen(true)} className="p-2 rounded-xl text-text-secondary">
+            <Menu size={22} />
+          </button>
+          <Logo size="sm" />
+          <div className="w-10" />
+        </div>
+      </div>
 
       {/* Mobile drawer */}
       {mobileOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/60" onClick={() => setMobileOpen(false)} />
-          <aside className="relative w-64 bg-bg-secondary border-r border-bg-border flex flex-col h-full">
+          <aside className="relative w-64 bg-bg-secondary border-r border-bg-border flex flex-col h-full safe-top safe-bottom">
             <button
               onClick={() => setMobileOpen(false)}
-              className="absolute top-4 right-4 p-1.5 text-text-muted hover:text-text-primary"
+              className="absolute right-4 p-1.5 text-text-muted hover:text-text-primary"
+              style={{ top: 'calc(env(safe-area-inset-top) + 12px)' }}
             >
               <X size={20} />
             </button>

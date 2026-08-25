@@ -1,4 +1,4 @@
-import { Bell, ExternalLink, AlertTriangle, Clock, CheckCircle } from 'lucide-react';
+import { Bell, ExternalLink, AlertTriangle, Clock, CheckCircle, Share2 } from 'lucide-react';
 import { Service } from '../../types';
 import { ServiceIcon } from '../../components/ServiceIcon';
 import { getDaysUntilBilling, getBillingUrgency } from '../../lib/rotation';
@@ -104,6 +104,33 @@ export function Reminders({ services }: RemindersProps) {
   );
 }
 
+// Opens the native share sheet (Messages, Mail, etc.) so the user can text or
+// email themselves the cancel link. Falls back to copying it on browsers
+// without the Web Share API.
+async function shareCancelLink(service: Service) {
+  if (!service.cancel_url) return;
+  const text = `Cancel ${service.name} ($${service.cost_monthly}/mo): ${service.cancel_url}`;
+  const shareData = {
+    title: `Cancel ${service.name}`,
+    text: `Cancel ${service.name} ($${service.cost_monthly}/mo)`,
+    url: service.cancel_url,
+  };
+  if (typeof navigator.share === 'function') {
+    try {
+      await navigator.share(shareData);
+      return;
+    } catch {
+      return; // user dismissed the share sheet
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    alert('Cancel link copied to clipboard');
+  } catch {
+    window.prompt('Copy the cancel link:', text);
+  }
+}
+
 function BillingCard({ service, days }: { service: Service; days: number | null }) {
   const urgency = getBillingUrgency(days);
 
@@ -148,15 +175,24 @@ function BillingCard({ service, days }: { service: Service; days: number | null 
         )}
 
         {service.cancel_url && (
-          <a
-            href={service.cancel_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-1.5 text-text-muted hover:text-accent-orange rounded-lg transition-colors"
-            title="Cancel subscription"
-          >
-            <ExternalLink size={14} />
-          </a>
+          <>
+            <button
+              onClick={() => shareCancelLink(service)}
+              className="p-1.5 text-text-muted hover:text-accent-teal rounded-lg transition-colors"
+              title="Text or email the cancel link"
+            >
+              <Share2 size={14} />
+            </button>
+            <a
+              href={service.cancel_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 text-text-muted hover:text-accent-orange rounded-lg transition-colors"
+              title="Cancel subscription"
+            >
+              <ExternalLink size={14} />
+            </a>
+          </>
         )}
       </div>
     </div>
