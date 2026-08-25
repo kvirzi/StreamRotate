@@ -39,7 +39,7 @@ function unsubscribeUrl(userId: string): string {
  * lead times, and email them a renewal reminder (unless they've opted out).
  * Returns run stats. Shared by the daily cron and the manual HTTP endpoint.
  */
-export async function runBillingReminders(targetDays: number[]): Promise<{
+export async function runBillingReminders(targetDays: number[], onlyEmail?: string): Promise<{
   usersEmailed: number;
   servicesMatched: number;
 }> {
@@ -60,6 +60,8 @@ export async function runBillingReminders(targetDays: number[]): Promise<{
 
     const user = Array.isArray(s.users) ? s.users[0] : s.users;
     if (!user || user.email_reminders === false || !user.email) continue;
+    // Test-mode: restrict the run to a single address.
+    if (onlyEmail && user.email.toLowerCase() !== onlyEmail.toLowerCase()) continue;
 
     const renewal = new Date();
     renewal.setDate(renewal.getDate() + days);
