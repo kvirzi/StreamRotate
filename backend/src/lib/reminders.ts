@@ -153,6 +153,9 @@ export async function runBillingReminders(targetDays: number[], onlyEmail?: stri
           nonDoneShows: (showsByService.get(svc.id) || []).length,
         })),
         chosenNextUp: nextUp,
+        nonDoneShows: ((allShows || []) as any[])
+          .filter(sh => sh.user_id === userId)
+          .map(sh => ({ title: sh.title, service_id: sh.service_id, status: sh.status })),
       });
     }
     if (!debug) {
