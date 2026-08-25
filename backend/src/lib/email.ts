@@ -44,6 +44,13 @@ export interface BillingReminderItem {
   cancel_url: string | null;
 }
 
+// The next service in the rotation to reactivate, with a few of its shows.
+export interface NextUp {
+  serviceName: string;
+  signupUrl: string | null;
+  shows: string[];
+}
+
 function escapeHtml(s: string) {
   return s.replace(/[&<>"']/g, c => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string
@@ -51,61 +58,92 @@ function escapeHtml(s: string) {
 }
 
 // User-facing email listing subscriptions renewing soon: each with its renewal
-// (cancel-by) date and a one-tap cancel link, plus a "what to watch next" nudge
-// and a one-click unsubscribe link.
+// (cancel-by) date and a one-tap cancel link, plus the next service in the
+// rotation to reactivate, and a one-click unsubscribe link.
 export async function sendBillingReminder(
   userEmail: string,
   items: BillingReminderItem[],
-  nextUp: string[],
+  nextUp: NextUp | null,
   unsubscribeUrl: string,
 ) {
   if (!items.length) return;
+  const { subject, html } = buildBillingReminderEmail(items, nextUp, unsubscribeUrl);
+  await sendEmail(userEmail, subject, html);
+}
+
+// Pure builder (no I/O) so the template can be previewed/tested in isolation.
+export function buildBillingReminderEmail(
+  items: BillingReminderItem[],
+  nextUp: NextUp | null,
+  unsubscribeUrl: string,
+): { subject: string; html: string } {
   const soonest = Math.min(...items.map(i => i.days));
   const total = items.reduce((sum, i) => sum + (Number(i.cost_monthly) || 0), 0);
 
-  const rows = items.map(i => {
+  const cards = items.map(i => {
     const when = i.days === 0 ? 'today' : i.days === 1 ? 'tomorrow' : `in ${i.days} days`;
     const cancelBtn = i.cancel_url
-      ? `<a href="${escapeHtml(i.cancel_url)}" style="display:inline-block;background:#e8734a;color:#fff;text-decoration:none;padding:8px 16px;border-radius:8px;font-weight:600;font-size:14px">Cancel ${escapeHtml(i.name)}</a>`
-      : `<span style="color:#888;font-size:13px">No cancel link saved</span>`;
-    return `<tr>
-      <td style="padding:14px 0;border-bottom:1px solid #eee">
-        <div style="font-weight:600;font-size:16px;color:#1a1a24">${escapeHtml(i.name)}</div>
-        <div style="color:#666;font-size:13px;margin-top:2px">$${Number(i.cost_monthly).toFixed(2)}/mo · renews ${when}</div>
-        <div style="color:#e8734a;font-size:13px;margin-top:2px;font-weight:600">Cancel by ${escapeHtml(i.renewalLabel)}</div>
-      </td>
-      <td style="padding:14px 0;border-bottom:1px solid #eee;text-align:right">${cancelBtn}</td>
-    </tr>`;
+      ? `<a href="${escapeHtml(i.cancel_url)}" style="display:inline-block;background:#e8734a;color:#ffffff;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:600;font-size:14px">Cancel ${escapeHtml(i.name)} →</a>`
+      : `<span style="color:#9aa;font-size:13px">Add a cancel link in the app</span>`;
+    return `<table role="presentation" width="100%" style="border-collapse:separate;background:#ffffff;border:1px solid #e7e7ee;border-radius:14px;margin:0 0 12px">
+      <tr><td style="padding:18px 20px">
+        <div style="font-weight:700;font-size:18px;color:#12121a">${escapeHtml(i.name)}</div>
+        <div style="color:#6b6b78;font-size:13px;margin-top:3px">$${Number(i.cost_monthly).toFixed(2)}/mo · renews ${when}</div>
+        <div style="display:inline-block;margin-top:10px;background:#fdece4;color:#c85a34;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px">Cancel by ${escapeHtml(i.renewalLabel)}</div>
+        <div style="margin-top:16px">${cancelBtn}</div>
+      </td></tr>
+    </table>`;
   }).join('');
 
-  const nextUpBlock = nextUp.length
-    ? `<div style="background:#f6f6fa;border-radius:12px;padding:16px;margin:20px 0">
-         <div style="font-weight:700;font-size:14px;color:#1a1a24;margin-bottom:8px">▶ What to watch next</div>
-         <div style="color:#444;font-size:14px;line-height:1.7">${nextUp.map(t => `• ${escapeHtml(t)}`).join('<br>')}</div>
-       </div>`
-    : '';
+  let nextUpBlock = '';
+  if (nextUp && nextUp.shows.length) {
+    const showList = nextUp.shows
+      .map(t => `<div style="color:#e9e9f0;font-size:14px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.08)">▸ ${escapeHtml(t)}</div>`)
+      .join('');
+    const signupBtn = nextUp.signupUrl
+      ? `<div style="margin-top:16px"><a href="${escapeHtml(nextUp.signupUrl)}" style="display:inline-block;background:#3db8a0;color:#04140f;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:700;font-size:14px">Reactivate ${escapeHtml(nextUp.serviceName)} →</a></div>`
+      : '';
+    nextUpBlock = `
+      <table role="presentation" width="100%" style="border-collapse:separate;background:#161622;border-radius:16px;margin:22px 0">
+        <tr><td style="padding:20px 22px">
+          <div style="color:#8a8aa0;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase">Up next in your rotation</div>
+          <div style="color:#ffffff;font-size:20px;font-weight:800;margin:6px 0 2px">${escapeHtml(nextUp.serviceName)}</div>
+          <div style="color:#8a8aa0;font-size:13px;margin-bottom:12px">Reactivate it and dig into these:</div>
+          ${showList}
+          ${signupBtn}
+        </td></tr>
+      </table>`;
+  }
 
   const subject = items.length === 1
     ? `⏰ ${items[0].name} renews ${soonest === 0 ? 'today' : soonest === 1 ? 'tomorrow' : `in ${soonest} days`}`
     : `⏰ ${items.length} subscriptions renewing soon`;
 
   const html = `
-  <div style="max-width:520px;margin:0 auto;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1a1a24">
-    <div style="font-size:22px;font-weight:700;margin-bottom:4px"><span style="color:#e8734a">Stream</span>Rotate</div>
-    <p style="color:#444;font-size:15px;line-height:1.5">
-      Heads up — the ${items.length === 1 ? 'subscription below renews' : 'subscriptions below renew'} soon.
-      Still watching? Keep it. Not right now? Cancel before the date and save it for later.
-    </p>
-    <table style="width:100%;border-collapse:collapse;margin:16px 0">${rows}</table>
-    <p style="color:#666;font-size:14px">Estimated monthly total: <strong>$${total.toFixed(2)}</strong></p>
-    ${nextUpBlock}
-    <p style="color:#999;font-size:12px;margin-top:24px;border-top:1px solid #eee;padding-top:12px">
-      You're getting this because you track these services in StreamRotate.
-      Manage reminders in the app, or <a href="${escapeHtml(unsubscribeUrl)}" style="color:#999">unsubscribe from renewal emails</a>.
-    </p>
+  <div style="background:#f4f4f8;padding:28px 16px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+    <table role="presentation" width="100%" style="max-width:540px;margin:0 auto;border-collapse:separate">
+      <tr><td style="padding:0 4px 18px">
+        <span style="font-size:24px;font-weight:800;letter-spacing:-0.02em"><span style="color:#e8734a">Stream</span><span style="color:#12121a">Rotate</span></span>
+      </td></tr>
+      <tr><td>
+        <div style="color:#3a3a46;font-size:16px;line-height:1.55;margin-bottom:18px">
+          ${items.length === 1
+            ? `Your <strong>${escapeHtml(items[0].name)}</strong> subscription renews soon.`
+            : `You have <strong>${items.length} subscriptions</strong> renewing soon.`}
+          Done watching? Cancel before the date and rotate to something new — you can always come back.
+        </div>
+        ${cards}
+        <div style="color:#6b6b78;font-size:13px;padding:4px 4px 0">Estimated monthly total: <strong style="color:#12121a">$${total.toFixed(2)}</strong></div>
+        ${nextUpBlock}
+        <div style="color:#a0a0ad;font-size:12px;line-height:1.6;margin-top:24px;padding-top:16px;border-top:1px solid #e2e2ea">
+          You're getting this because you track these services in StreamRotate.<br>
+          Manage reminders in the app, or <a href="${escapeHtml(unsubscribeUrl)}" style="color:#a0a0ad;text-decoration:underline">unsubscribe from renewal emails</a>.
+        </div>
+      </td></tr>
+    </table>
   </div>`;
 
-  await sendEmail(userEmail, subject, html);
+  return { subject, html };
 }
 
 // Feedback / suggestion / bug report submitted from the app, sent to the owner.

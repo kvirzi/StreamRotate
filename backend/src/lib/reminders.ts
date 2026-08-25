@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { supabaseAdmin } from './supabase';
-import { sendBillingReminder, BillingReminderItem } from './email';
+import { sendBillingReminder, BillingReminderItem, NextUp } from './email';
+import { catalogCancelUrl, catalogSignupUrl } from './serviceCatalog';
 
 const BASE_URL = process.env.PUBLIC_API_URL || process.env.FRONTEND_URL || 'https://streamrotate.com';
 
@@ -72,7 +73,8 @@ export async function runBillingReminders(targetDays: number[], onlyEmail?: stri
       cost_monthly: s.cost_monthly,
       days,
       renewalLabel,
-      cancel_url: s.cancel_url,
+      // Fall back to a known cancel URL when the user didn't save one.
+      cancel_url: s.cancel_url || catalogCancelUrl(s.name),
     };
     const entry = byUser.get(s.user_id) || { email: user.email as string, items: [] as BillingReminderItem[] };
     entry.items.push(item);
@@ -81,26 +83,63 @@ export async function runBillingReminders(targetDays: number[], onlyEmail?: stri
 
   if (!byUser.size) return { usersEmailed: 0, servicesMatched: 0 };
 
-  // "What to watch next": each user's currently-watching shows, soonest episode first.
+  // "What to watch next" = the next service in the rotation to reactivate: the
+  // service (other than the one being cancelled) with the biggest unwatched
+  // backlog, plus a few of its shows and a reactivation link.
   const userIds = [...byUser.keys()];
-  const { data: shows } = await supabaseAdmin
-    .from('shows')
-    .select('user_id, title, next_air_date, status')
-    .in('user_id', userIds)
-    .eq('status', 'watching');
+  const [{ data: allServices }, { data: allShows }] = await Promise.all([
+    supabaseAdmin.from('services').select('id, user_id, name, active, is_free').in('user_id', userIds),
+    supabaseAdmin.from('shows').select('user_id, service_id, title, status, episodes_remaining').in('user_id', userIds).neq('status', 'done'),
+  ]);
 
-  const nextUpByUser = new Map<string, string[]>();
-  for (const row of (shows || []) as any[]) {
-    const list = nextUpByUser.get(row.user_id) || [];
-    list.push(row.title);
-    nextUpByUser.set(row.user_id, list);
+  // Index shows by service.
+  const showsByService = new Map<string, { title: string; status: string }[]>();
+  for (const row of (allShows || []) as any[]) {
+    if (!row.service_id) continue;
+    const list = showsByService.get(row.service_id) || [];
+    list.push({ title: row.title, status: row.status });
+    showsByService.set(row.service_id, list);
+  }
+
+  const servicesByUser = new Map<string, any[]>();
+  for (const svc of (allServices || []) as any[]) {
+    const list = servicesByUser.get(svc.user_id) || [];
+    list.push(svc);
+    servicesByUser.set(svc.user_id, list);
+  }
+
+  function pickNextUp(userId: string, renewingNames: Set<string>): NextUp | null {
+    const services = servicesByUser.get(userId) || [];
+    let best: { name: string; count: number; inactive: boolean; shows: { title: string; status: string }[] } | null = null;
+
+    for (const svc of services) {
+      if (renewingNames.has(svc.name.toLowerCase())) continue; // don't suggest the one they're cancelling
+      const svcShows = showsByService.get(svc.id) || [];
+      if (!svcShows.length) continue;
+      const inactive = !svc.active;
+      // Prefer more backlog; tie-break toward an inactive service (true "reactivate").
+      const better = !best || svcShows.length > best.count ||
+        (svcShows.length === best.count && inactive && !best.inactive);
+      if (better) best = { name: svc.name, count: svcShows.length, inactive, shows: svcShows };
+    }
+
+    if (!best) return null;
+    // Watching shows first, then queued, up to 3.
+    const ordered = [...best.shows].sort((a, b) =>
+      (a.status === 'watching' ? 0 : 1) - (b.status === 'watching' ? 0 : 1));
+    return {
+      serviceName: best.name,
+      signupUrl: catalogSignupUrl(best.name),
+      shows: ordered.slice(0, 3).map(s => s.title),
+    };
   }
 
   let emailed = 0;
   let matched = 0;
   for (const [userId, { email, items }] of byUser) {
     matched += items.length;
-    const nextUp = (nextUpByUser.get(userId) || []).slice(0, 3);
+    const renewingNames = new Set(items.map(i => i.name.toLowerCase()));
+    const nextUp = pickNextUp(userId, renewingNames);
     await sendBillingReminder(email, items, nextUp, unsubscribeUrl(userId));
     emailed++;
   }
