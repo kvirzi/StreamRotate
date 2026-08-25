@@ -26,6 +26,9 @@ const allowedOrigins = [
   'capacitor://localhost',
   'ionic://localhost',
   ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
+  // The backend's own public origin — lets same-origin admin/test calls
+  // (e.g. a browser fetch to the manual reminder trigger) pass CORS.
+  ...(process.env.PUBLIC_API_URL ? [process.env.PUBLIC_API_URL] : []),
 ];
 
 app.use(cors({
