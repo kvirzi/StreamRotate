@@ -11,10 +11,11 @@ const TMDB_BASE = 'https://api.themoviedb.org/3';
  * Runs nightly (see scheduler) and can be triggered manually for testing.
  */
 export async function refreshAllShowMeta(): Promise<{ checked: number; updated: number }> {
+  // Include done shows too: a "done" show that's a Returning Series still gets
+  // new episodes/seasons, and refreshing it is how we learn the return date.
   const { data: shows, error } = await supabaseAdmin
     .from('shows')
     .select('id, tmdb_id, next_air_date, tv_status, total_seasons')
-    .neq('status', 'done')
     .not('tmdb_id', 'is', null);
 
   if (error) throw error;
