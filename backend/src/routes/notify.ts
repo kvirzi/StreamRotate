@@ -64,6 +64,14 @@ router.post('/refresh-shows', async (req: Request, res: Response): Promise<void>
   }
   try {
     const stats = await refreshAllShowMeta();
+    if (req.query.debug === '1') {
+      const { data: shows } = await supabaseAdmin
+        .from('shows')
+        .select('title, status, tmdb_id, next_air_date, tv_status')
+        .order('title');
+      res.json({ ok: true, ...stats, shows });
+      return;
+    }
     res.json({ ok: true, ...stats });
   } catch (err) {
     console.error('Show refresh error:', err);
