@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import { runBillingReminders } from './reminders';
+import { refreshAllShowMeta } from './refreshShows';
 
 // Lead time(s), in days before renewal, to send reminders. Override with
 // BILLING_REMINDER_DAYS="3,1". Defaults to a single 3-day-ahead nudge.
@@ -23,5 +24,16 @@ export function startScheduler() {
       console.error('[scheduler] billing reminder run failed:', err);
     }
   });
-  console.log(`[scheduler] billing reminders scheduled daily at 09:00 (lead: ${REMINDER_DAYS.join(',')}d)`);
+  // Refresh TMDB metadata nightly at 03:00, before the morning reminder run, so
+  // next_air_date stays current for the dashboard, timeline, and notifications.
+  cron.schedule('0 3 * * *', async () => {
+    try {
+      const stats = await refreshAllShowMeta();
+      console.log('[scheduler] show metadata refreshed', stats);
+    } catch (err) {
+      console.error('[scheduler] show metadata refresh failed:', err);
+    }
+  });
+
+  console.log(`[scheduler] billing reminders scheduled daily at 09:00 (lead: ${REMINDER_DAYS.join(',')}d); show refresh at 03:00`);
 }

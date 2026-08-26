@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { notifyNewSignup } from '../lib/email';
 import { supabaseAdmin } from '../lib/supabase';
 import { runBillingReminders, verifyUnsubscribeToken } from '../lib/reminders';
+import { refreshAllShowMeta } from '../lib/refreshShows';
 
 const router = Router();
 
@@ -50,6 +51,23 @@ router.post('/billing-reminders', async (req: Request, res: Response): Promise<v
   } catch (err) {
     console.error('Billing reminder error:', err);
     res.status(500).json({ error: 'Reminder run failed' });
+  }
+});
+
+// POST /api/notify/refresh-shows — manual trigger for the nightly TMDB refresh
+// (the scheduler runs it automatically at 03:00). Protected by the shared secret.
+router.post('/refresh-shows', async (req: Request, res: Response): Promise<void> => {
+  const secret = req.headers['x-webhook-secret'];
+  if (!process.env.WEBHOOK_SECRET || secret !== process.env.WEBHOOK_SECRET) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  try {
+    const stats = await refreshAllShowMeta();
+    res.json({ ok: true, ...stats });
+  } catch (err) {
+    console.error('Show refresh error:', err);
+    res.status(500).json({ error: 'Refresh failed' });
   }
 });
 

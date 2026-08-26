@@ -54,8 +54,12 @@ export function Dashboard({ services, shows, onNavigate }: DashboardProps) {
     .sort((a, b) => (a.days ?? 99) - (b.days ?? 99))
     .slice(0, 4);
 
+  // Only genuinely upcoming episodes — a stored next_air_date can be stale and
+  // point at an episode that already aired, which shouldn't show here.
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
   const upcomingEps = shows
-    .filter(s => s.next_air_date)
+    .filter(s => s.next_air_date && new Date(`${s.next_air_date}T00:00:00`) >= startOfToday)
     .sort((a, b) => new Date(a.next_air_date!).getTime() - new Date(b.next_air_date!).getTime())
     .slice(0, 4);
 
