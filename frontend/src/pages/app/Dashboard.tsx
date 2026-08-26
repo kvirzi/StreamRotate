@@ -204,7 +204,7 @@ export function Dashboard({ services, shows, onNavigate }: DashboardProps) {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-text-primary truncate">{show.title}</p>
                       <p className="text-xs text-text-muted">
-                        {new Date(show.next_air_date!).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        {new Date(`${show.next_air_date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </p>
                     </div>
                   </div>
