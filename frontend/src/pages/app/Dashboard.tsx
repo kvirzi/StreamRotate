@@ -1,9 +1,18 @@
-import { useMemo } from 'react';
-import { DollarSign, Tv2, Play, CheckCircle, Trophy, Calendar, Clock, Zap, LucideIcon } from 'lucide-react';
+import { useMemo, useState, useEffect } from 'react';
+import { DollarSign, Tv2, Play, CheckCircle, Trophy, Calendar, Clock, Zap, ListVideo, LucideIcon } from 'lucide-react';
 import { Service, Show } from '../../types';
 import { computeRotation, getDaysUntilBilling, getBillingUrgency } from '../../lib/rotation';
 import { ServiceIcon } from '../../components/ServiceIcon';
 import { EpisodeTimeline } from '../../components/EpisodeTimeline';
+import { showsApi } from '../../lib/api';
+
+interface ReadyShow {
+  id: string;
+  title: string;
+  count: number;
+  oldestAirDate: string;
+  newestAirDate: string;
+}
 
 interface DashboardProps {
   services: Service[];
@@ -36,6 +45,17 @@ function StatCard({ icon: Icon, label, value, sub, color }: {
 
 export function Dashboard({ services, shows, onNavigate }: DashboardProps) {
   const rotation = useMemo(() => computeRotation(services, shows), [services, shows]);
+
+  // Shows with aired-but-unwatched episodes. Refetched whenever the shows list
+  // changes (e.g. after marking episodes watched) so the queue stays current.
+  const [readyShows, setReadyShows] = useState<ReadyShow[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    showsApi.getReady()
+      .then(res => { if (!cancelled) setReadyShows(res.data); })
+      .catch(() => { if (!cancelled) setReadyShows([]); });
+    return () => { cancelled = true; };
+  }, [shows]);
   const monthlyCost = services
     .filter(s => s.active && !s.is_free)
     .reduce((sum, s) => sum + (s.cost_monthly || 0), 0);
@@ -208,6 +228,42 @@ export function Dashboard({ services, shows, onNavigate }: DashboardProps) {
                       </p>
                     </div>
                   </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Ready to watch — aired episodes you haven't watched yet */}
+          {readyShows.length > 0 && (
+            <div className="bg-bg-card border border-bg-border rounded-2xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <ListVideo size={16} className="text-accent-orange" />
+                  <h3 className="font-display font-semibold text-text-primary text-sm">Ready to Watch</h3>
+                </div>
+                <button onClick={() => onNavigate('shows')} className="text-xs text-text-muted hover:text-accent-orange">
+                  View →
+                </button>
+              </div>
+              <div className="space-y-2">
+                {readyShows.map(show => (
+                  <button
+                    key={show.id}
+                    onClick={() => onNavigate('shows')}
+                    className="w-full flex items-center gap-3 py-1 text-left hover:bg-bg-hover/40 rounded-lg px-1 -mx-1 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-text-primary truncate">{show.title}</p>
+                      <p className="text-xs text-text-muted">
+                        Aired {new Date(`${show.newestAirDate}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </p>
+                    </div>
+                    {show.count > 1 && (
+                      <span className="text-[11px] font-semibold text-accent-orange bg-accent-orange/10 px-2 py-0.5 rounded-full flex-shrink-0">
+                        {show.count} eps
+                      </span>
+                    )}
+                  </button>
                 ))}
               </div>
             </div>

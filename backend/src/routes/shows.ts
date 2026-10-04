@@ -20,6 +20,54 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   res.json(data);
 });
 
+// GET /api/shows/ready — shows with episodes that have aired but aren't watched
+// yet, so they don't get lost when their air date scrolls off the timeline.
+// Grouped per show with the count and the oldest/newest waiting air dates.
+router.get('/ready', async (req: AuthRequest, res: Response): Promise<void> => {
+  const client = createUserClient(req.accessToken!);
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+  const { data, error } = await client
+    .from('episodes')
+    .select('air_date, season_number, episode_number, shows!inner(id, title, status, user_id)')
+    .eq('watched', false)
+    .not('air_date', 'is', null)
+    .lte('air_date', today)
+    .eq('shows.user_id', req.userId)
+    .neq('shows.status', 'done')
+    .order('air_date', { ascending: true });
+
+  if (error) {
+    res.status(500).json({ error: error.message });
+    return;
+  }
+
+  // Group the aired-but-unwatched episodes by show.
+  const byShow = new Map<string, { id: string; title: string; count: number; oldestAirDate: string; newestAirDate: string }>();
+  for (const row of (data || []) as any[]) {
+    const show = Array.isArray(row.shows) ? row.shows[0] : row.shows;
+    if (!show) continue;
+    const entry = byShow.get(show.id);
+    if (!entry) {
+      byShow.set(show.id, {
+        id: show.id,
+        title: show.title,
+        count: 1,
+        oldestAirDate: row.air_date,
+        newestAirDate: row.air_date,
+      });
+    } else {
+      entry.count += 1;
+      if (row.air_date < entry.oldestAirDate) entry.oldestAirDate = row.air_date;
+      if (row.air_date > entry.newestAirDate) entry.newestAirDate = row.air_date;
+    }
+  }
+
+  // Most recently aired first.
+  const result = [...byShow.values()].sort((a, b) => b.newestAirDate.localeCompare(a.newestAirDate));
+  res.json(result);
+});
+
 // POST /api/shows
 router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
   const {

@@ -28,6 +28,7 @@ export const servicesApi = {
 
 export const showsApi = {
   getAll: () => api.get('/shows'),
+  getReady: () => api.get('/shows/ready'),
   create: (data: Record<string, unknown>) => api.post('/shows', data),
   update: (id: string, data: Record<string, unknown>) => api.put(`/shows/${id}`, data),
   delete: (id: string) => api.delete(`/shows/${id}`),
