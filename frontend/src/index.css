@@ -15,6 +15,15 @@
   box-sizing: border-box;
 }
 
+/* Remove the browser's tap-to-zoom delay so buttons respond instantly, and
+   drop the grey tap highlight for a more native feel in the iOS/Android webview. */
+button, a, [role="button"], input, label, select {
+  touch-action: manipulation;
+}
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
 html, body, #root {
   background-color: var(--bg-primary);
   color: #f0f0f8;

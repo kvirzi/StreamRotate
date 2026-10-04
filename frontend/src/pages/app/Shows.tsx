@@ -1,4 +1,4 @@
-import { useState, useCallback, Fragment } from 'react';
+import { useState, useCallback, useRef, Fragment } from 'react';
 import { Plus, Search, ChevronDown, ChevronUp, Check, X, Tv2, Edit2, Trash2, RefreshCw, Play, Calendar } from 'lucide-react';
 import { Show, Service, TmdbSearchResult, TmdbEpisode, Episode } from '../../types';
 import { showsApi, tmdbApi } from '../../lib/api';
@@ -82,6 +82,9 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [expandedShows, setExpandedShows] = useState<Set<string>>(new Set());
   const [episodesMap, setEpisodesMap] = useState<Record<string, Episode[]>>({});
+  // Episodes with an in-flight toggle — blocks an accidental double-tap from
+  // firing a second toggle and landing the opposite of what you wanted.
+  const pendingEpisodes = useRef<Set<string>>(new Set());
   const [loadingEpisodes, setLoadingEpisodes] = useState<Set<string>>(new Set());
   const [activeSeason, setActiveSeason] = useState<Record<string, number>>({});
   const [refreshingMeta, setRefreshingMeta] = useState<Set<string>>(new Set());
@@ -336,21 +339,42 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
   };
 
   const toggleEpisode = async (show: Show, episode: Episode) => {
-    try {
-      const newWatched = !episode.watched;
-      await showsApi.updateEpisode(show.id, episode.id, newWatched);
-      const updated = (episodesMap[show.id] || []).map(ep =>
-        ep.id === episode.id ? { ...ep, watched: newWatched } : ep
-      );
-      setEpisodesMap(prev => ({ ...prev, [show.id]: updated }));
+    // Ignore a repeat tap while this episode's toggle is still saving — the
+    // first tap already flipped it optimistically, so a fast second tap is an
+    // accidental double that would otherwise undo it.
+    if (pendingEpisodes.current.has(episode.id)) return;
+    pendingEpisodes.current.add(episode.id);
 
-      // If every loaded episode is now watched, mark done and clear counter
+    const newWatched = !episode.watched;
+
+    // Optimistic update — flip immediately so the UI feels instant
+    const updated = (episodesMap[show.id] || []).map(ep =>
+      ep.id === episode.id ? { ...ep, watched: newWatched } : ep
+    );
+    setEpisodesMap(prev => ({ ...prev, [show.id]: updated }));
+
+    try {
+      await showsApi.updateEpisode(show.id, episode.id, newWatched);
+
+      // If every loaded episode is now watched, mark done and clear counter.
+      // Fire-and-forget so the tap never blocks on a full list refresh.
       const allWatched = updated.length > 0 && updated.every(ep => ep.watched);
       if (allWatched) {
-        try { await showsApi.update(show.id, { status: 'done', episodes_remaining: 0 }); } catch { /* ignore */ }
-        await onRefresh();
+        showsApi.update(show.id, { status: 'done', episodes_remaining: 0 })
+          .then(() => onRefresh())
+          .catch(() => { /* ignore */ });
       }
-    } catch { /* ignore */ }
+    } catch {
+      // Revert on failure
+      setEpisodesMap(prev => ({
+        ...prev,
+        [show.id]: (prev[show.id] || []).map(ep =>
+          ep.id === episode.id ? { ...ep, watched: episode.watched } : ep
+        ),
+      }));
+    } finally {
+      pendingEpisodes.current.delete(episode.id);
+    }
   };
 
   const loadTmdbEpisodes = async (show: Show, season: number) => {
@@ -414,15 +438,18 @@ export function Shows({ shows, services, onRefresh, plan }: ShowsProps) {
     const episodes = episodesMap[show.id] || [];
     const unwatched = episodes.filter(ep => !ep.watched);
     if (unwatched.length === 0) return;
-    await Promise.all(unwatched.map(ep => showsApi.updateEpisode(show.id, ep.id, true)));
-    // Update local episode map immediately
+
+    // Optimistic update — mark all watched instantly
     setEpisodesMap(prev => ({
       ...prev,
       [show.id]: (prev[show.id] || []).map(ep => ({ ...ep, watched: true })),
     }));
-    // Mark done and clear the episodes remaining counter, then refresh
-    try { await showsApi.update(show.id, { status: 'done', episodes_remaining: 0 }); } catch { /* ignore */ }
-    await onRefresh();
+
+    // Fire API calls in the background
+    Promise.all(unwatched.map(ep => showsApi.updateEpisode(show.id, ep.id, true)))
+      .then(() => showsApi.update(show.id, { status: 'done', episodes_remaining: 0 }).catch(() => {}))
+      .then(() => onRefresh())
+      .catch(() => onRefresh()); // refresh even on partial failure to sync state
   };
 
   const handleSeasonChange = async (show: Show, season: number) => {
