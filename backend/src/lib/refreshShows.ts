@@ -1,7 +1,11 @@
 import axios from 'axios';
 import { supabaseAdmin } from './supabase';
+import { syncSeasonEpisodes } from './episodeSync';
 
 const TMDB_BASE = 'https://api.themoviedb.org/3';
+
+// Shows with these TMDB statuses won't get new episodes, so skip episode sync.
+const FINISHED_STATUSES = new Set(['Ended', 'Canceled']);
 
 /**
  * Refresh stored TMDB metadata (next_air_date, tv_status, total_seasons) for
@@ -37,6 +41,12 @@ export async function refreshAllShowMeta(): Promise<{ checked: number; updated: 
           .update({ next_air_date: next, tv_status: status, total_seasons: seasons })
           .eq('id', s.id);
         updated++;
+      }
+
+      // Pull in newly-aired episodes for the latest season so the "Ready to
+      // Watch" queue stays current. Skip shows that can't get new episodes.
+      if (seasons && !FINISHED_STATUSES.has(status)) {
+        await syncSeasonEpisodes(supabaseAdmin, s.id, s.tmdb_id, seasons);
       }
     } catch (err) {
       console.error(`[refreshShows] tmdb ${s.tmdb_id} failed:`, (err as any)?.message || err);

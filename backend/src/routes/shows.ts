@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { createUserClient } from '../lib/supabase';
+import { syncSeasonEpisodes } from '../lib/episodeSync';
 
 const router = Router();
 
@@ -34,7 +35,6 @@ router.get('/ready', async (req: AuthRequest, res: Response): Promise<void> => {
     .not('air_date', 'is', null)
     .lte('air_date', today)
     .eq('shows.user_id', req.userId)
-    .neq('shows.status', 'done')
     .order('air_date', { ascending: true });
 
   if (error) {
@@ -109,6 +109,13 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
     res.status(500).json({ error: error.message });
     return;
   }
+
+  // Populate episodes for the season being tracked so the new show shows up in
+  // the "Ready to Watch" queue right away (not just on the timeline). Best-effort.
+  if (data?.tmdb_id) {
+    await syncSeasonEpisodes(client, data.id, data.tmdb_id, data.current_season || 1);
+  }
+
   res.status(201).json(data);
 });
 
