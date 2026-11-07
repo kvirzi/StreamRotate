@@ -6,6 +6,7 @@ import { signInWithApple, signInWithGoogle } from '../lib/appleAuth';
 import { Logo } from '../components/Logo';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
+import { Turnstile, captchaEnabled } from '../components/Turnstile';
 
 export function Login() {
   const navigate = useNavigate();
@@ -14,13 +15,19 @@ export function Login() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    if (captchaEnabled && !captchaToken) { setError('Please complete the “I’m not a robot” check.'); return; }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+        ...(captchaToken ? { options: { captchaToken } } : {}),
+      });
       if (error) { setError(error.message); return; }
       navigate('/app');
     } finally {
@@ -109,6 +116,8 @@ export function Login() {
               required
               autoComplete="current-password"
             />
+
+            <Turnstile onVerify={setCaptchaToken} onExpire={() => setCaptchaToken('')} />
 
             {error && <p className="text-sm text-red-400">{error}</p>}
 

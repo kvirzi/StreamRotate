@@ -6,6 +6,7 @@ import { signInWithApple, signInWithGoogle } from '../lib/appleAuth';
 import { Logo } from '../components/Logo';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
+import { Turnstile, captchaEnabled } from '../components/Turnstile';
 
 export function Signup() {
   const navigate = useNavigate();
@@ -15,17 +16,22 @@ export function Signup() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
 
   const handleSignup = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     if (password.length < 8) { setError('Password must be at least 8 characters'); return; }
+    if (captchaEnabled && !captchaToken) { setError('Please complete the “I’m not a robot” check.'); return; }
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: `${window.location.origin}/app` },
+        options: {
+          emailRedirectTo: `${window.location.origin}/app`,
+          ...(captchaToken ? { captchaToken } : {}),
+        },
       });
       if (error) { setError(error.message); return; }
       if (data.user && !data.session) {
@@ -126,6 +132,7 @@ export function Signup() {
                 required
                 autoComplete="new-password"
               />
+              <Turnstile onVerify={setCaptchaToken} onExpire={() => setCaptchaToken('')} />
               {error && <p className="text-sm text-red-400">{error}</p>}
               <Button type="submit" loading={loading} fullWidth size="lg">
                 Create Account
