@@ -43,6 +43,13 @@ interface TurnstileProps {
 export function Turnstile({ onVerify, onExpire }: TurnstileProps) {
   const ref = useRef<HTMLDivElement>(null);
   const widgetId = useRef<string | null>(null);
+  // Keep the latest callbacks in refs so the widget renders exactly once —
+  // depending on the callbacks directly re-ran the effect every render and put
+  // the widget in a verify/re-render loop.
+  const onVerifyRef = useRef(onVerify);
+  const onExpireRef = useRef(onExpire);
+  onVerifyRef.current = onVerify;
+  onExpireRef.current = onExpire;
 
   useEffect(() => {
     if (!SITE_KEY || !ref.current) return;
@@ -53,9 +60,9 @@ export function Turnstile({ onVerify, onExpire }: TurnstileProps) {
         if (cancelled || !ref.current || !window.turnstile) return;
         widgetId.current = window.turnstile.render(ref.current, {
           sitekey: SITE_KEY,
-          callback: (token: string) => onVerify(token),
-          'expired-callback': () => onExpire?.(),
-          'error-callback': () => onExpire?.(),
+          callback: (token: string) => onVerifyRef.current(token),
+          'expired-callback': () => onExpireRef.current?.(),
+          'error-callback': () => onExpireRef.current?.(),
           theme: 'dark',
         });
       })
@@ -67,7 +74,7 @@ export function Turnstile({ onVerify, onExpire }: TurnstileProps) {
         try { window.turnstile.remove(widgetId.current); } catch { /* ignore */ }
       }
     };
-  }, [onVerify, onExpire]);
+  }, []); // render once; callbacks come from refs
 
   if (!SITE_KEY) return null;
   return <div ref={ref} className="flex justify-center my-3" />;
