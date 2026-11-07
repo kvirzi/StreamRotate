@@ -1,0 +1,19 @@
+# Fly.io config for the StreamRotate backend.
+# Deploy from the backend/ directory: `fly deploy`.
+app = "streamrotate-api"
+primary_region = "iad"
+
+[build]
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  # Keep the machine always-on so the in-process 3am/9am cron jobs run and there
+  # are no cold starts. (This is the ~$2.19/mo always-on config.)
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
