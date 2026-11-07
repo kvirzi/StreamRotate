@@ -79,6 +79,80 @@ router.post('/refresh-shows', async (req: Request, res: Response): Promise<void>
   }
 });
 
+// POST /api/notify/cleanup-bots — removes dotted-Gmail alias bot sign-ups with
+// no activity. Dry-run by default; pass ?confirm=1 to actually delete. Tune the
+// dot threshold with ?dots=3 (default 3). Protected by the shared secret.
+router.post('/cleanup-bots', async (req: Request, res: Response): Promise<void> => {
+  const secret = req.headers['x-webhook-secret'];
+  if (!process.env.WEBHOOK_SECRET || secret !== process.env.WEBHOOK_SECRET) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+
+  const minDots = Math.max(1, parseInt(String(req.query.dots || '3'), 10) || 3);
+  const confirm = req.query.confirm === '1';
+
+  const countDots = (local: string) => (local.match(/\./g) || []).length;
+
+  try {
+    // Page through all auth users and flag dotted-Gmail aliases.
+    const candidates: { id: string; email: string; dots: number }[] = [];
+    for (let page = 1; page < 1000; page++) {
+      const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
+      if (error) throw error;
+      const users = data?.users || [];
+      for (const u of users) {
+        const email = (u.email || '').toLowerCase();
+        const [local, domain] = email.split('@');
+        if (!local || (domain !== 'gmail.com' && domain !== 'googlemail.com')) continue;
+        const dots = countDots(local);
+        if (dots >= minDots) candidates.push({ id: u.id, email, dots });
+      }
+      if (users.length < 200) break;
+    }
+
+    if (!candidates.length) {
+      res.json({ ok: true, minDots, candidates: 0, toDelete: 0, deleted: 0 });
+      return;
+    }
+
+    // Keep anyone who actually uses the app (has shows or services).
+    const ids = candidates.map(c => c.id);
+    const active = new Set<string>();
+    for (let i = 0; i < ids.length; i += 100) {
+      const chunk = ids.slice(i, i + 100);
+      const [{ data: s }, { data: sv }] = await Promise.all([
+        supabaseAdmin.from('shows').select('user_id').in('user_id', chunk),
+        supabaseAdmin.from('services').select('user_id').in('user_id', chunk),
+      ]);
+      for (const r of (s || []) as any[]) active.add(r.user_id);
+      for (const r of (sv || []) as any[]) active.add(r.user_id);
+    }
+    const toDelete = candidates.filter(c => !active.has(c.id));
+
+    let deleted = 0;
+    if (confirm) {
+      for (const c of toDelete) {
+        const { error } = await supabaseAdmin.auth.admin.deleteUser(c.id);
+        if (!error) deleted++;
+      }
+    }
+
+    res.json({
+      ok: true,
+      minDots,
+      dryRun: !confirm,
+      candidates: candidates.length,
+      toDelete: toDelete.length,
+      deleted,
+      sample: toDelete.slice(0, 20).map(c => ({ email: c.email, dots: c.dots })),
+    });
+  } catch (err) {
+    console.error('Bot cleanup error:', err);
+    res.status(500).json({ error: 'Cleanup failed' });
+  }
+});
+
 // GET /api/notify/unsubscribe?u=<userId>&t=<token> — one-click opt-out from the
 // email footer. Verifies the signed token, then flips the user's flag off.
 router.get('/unsubscribe', async (req: Request, res: Response): Promise<void> => {
